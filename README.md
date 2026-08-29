@@ -2,6 +2,22 @@
 
 # Gestor de Planificaciones Docentes (GPD)
 
+> **Estado actual:** prototipo en proceso de estabilización. No debe utilizarse con
+> documentos institucionales reales hasta completar las correcciones P0 definidas
+> en `Spec/S12-roadmap-aceptacion.md`.
+
+## Desarrollo guiado por Spec as a Skill
+
+La modernización del proyecto se ejecuta con Antigravity mediante:
+
+- `AGENTS.md`: reglas obligatorias del repositorio.
+- `PromptMaster.md`: contexto y prompt inicial.
+- `Spec/`: fuente de verdad, diagnóstico y requisitos.
+- `Skill/`: runbooks K-001 a K-012.
+- `.agents/skills/`: skills nativas descubribles por Antigravity.
+
+Comienza leyendo `PromptMaster.md` y ejecutando únicamente K-001.
+
 ## Visión General
 
 Este proyecto, desarrollado en Laravel, tiene como objetivo digitalizar y automatizar el flujo de trabajo de creación, revisión, aprobación y archivo de las planificaciones docentes. La plataforma está diseñada para ser utilizada por tres roles principales: Docente, Secretaría y Vicerrector, cada uno con permisos y vistas específicas para sus responsabilidades.
