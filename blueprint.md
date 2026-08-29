@@ -65,6 +65,10 @@ Este proyecto tiene como objetivo digitalizar y automatizar el flujo de trabajo 
 - [ ] **Implementar la lógica para consultar y agrupar las planificaciones por estado.**
 - [ ] **Mostrar los resultados en una tabla dentro de la misma vista.**
 
+### Mantenimiento y Configuración
+
+- [x] **Generar clave de encriptación de la aplicación (`php artisan key:generate`) para resolver `Illuminate\Encryption\MissingAppKeyException`.**
+
 ## Credenciales de Usuario
 
 | Rol | Email | Contraseña |
