@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Planning;
 use App\Models\Subject;
-use Google\Client;
+use App\Rules\AcademicDocumentRule;
 use Google\Service\Drive;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -56,70 +57,36 @@ class PlanningController extends Controller
     {
         Gate::authorize('create', Planning::class);
 
-        // Flujo para archivos de Google Drive
+        // Flujo para archivos de Google Drive (deshabilitado / postergado)
         if ($request->has('google_drive_file_id')) {
-            $request->validate([
-                'title' => 'required|string|max:255',
-                'google_drive_file_id' => 'required|string',
-                'subject_id' => 'required|exists:subjects,id',
-            ]);
+            return redirect()->back()->with('error', 'La carga desde Google Drive no está activa en este momento.');
+        }
 
-            try {
-                $token = $request->session()->get('google_drive_token');
-                if (! $token) {
-                    return redirect()->route('google.connect')->with('error', 'Por favor, conecta tu cuenta de Google Drive primero.');
-                }
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'file' => [
+                'required',
+                'file',
+                'max:10240', // 10MB
+                new AcademicDocumentRule,
+            ],
+            'subject_id' => 'required|exists:subjects,id',
+        ]);
 
-                $client = new Client;
-                $client->setAccessToken($token);
+        $uploadedFile = $request->file('file');
+        $originalExtension = strtolower($uploadedFile->getClientOriginalExtension());
+        $randomFileName = Str::random(40).'.'.$originalExtension;
 
-                if ($client->isAccessTokenExpired()) {
-                    if (isset($token['refresh_token'])) {
-                        $client->fetchAccessTokenWithRefreshToken($token['refresh_token']);
-                        $request->session()->put('google_drive_token', $client->getAccessToken());
-                    } else {
-                        return redirect()->route('google.connect')->with('error', 'La sesión de Google ha expirado. Por favor, conéctate de nuevo.');
-                    }
-                }
+        $path = null;
+        try {
+            DB::beginTransaction();
 
-                $driveService = new Drive($client);
-                $fileId = $request->google_drive_file_id;
+            // Guardar exclusivamente en el disco privado
+            $path = $uploadedFile->storeAs('', $randomFileName, 'private_plannings');
 
-                $fileMetadata = $driveService->files->get($fileId, ['fields' => 'name']);
-                $originalFileName = $fileMetadata->name;
-
-                $fileContent = $driveService->files->get($fileId, ['alt' => 'media']);
-
-                $extension = pathinfo($originalFileName, PATHINFO_EXTENSION) ?: 'docx';
-                $newFileName = Str::slug(pathinfo($originalFileName, PATHINFO_FILENAME)).'_'.Str::random(10).'.'.$extension;
-                $path = 'plannings/'.$newFileName;
-
-                Storage::disk('public')->put($path, $fileContent->getBody()->getContents());
-
-                Planning::create([
-                    'user_id' => Auth::id(),
-                    'title' => $request->title,
-                    'file_path' => $path,
-                    'subject_id' => $request->subject_id,
-                ]);
-
-                return redirect()->route('plannings.index')->with('success', 'Planificación creada desde Google Drive exitosamente.');
-
-            } catch (\Exception $e) {
-                Log::error('Fallo en la descarga de Google Drive: '.$e->getMessage());
-
-                return redirect()->back()->with('error', 'No se pudo descargar el archivo de Google Drive. Detalle: '.$e->getMessage());
+            if (! $path) {
+                throw new \Exception('No se pudo guardar el archivo en el almacenamiento privado.');
             }
-
-        } else {
-            // Flujo existente para subidas de archivo directas
-            $request->validate([
-                'title' => 'required|string|max:255',
-                'file' => 'required|file|max:10240|mimetypes:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'subject_id' => 'required|exists:subjects,id',
-            ]);
-
-            $path = $request->file('file')->store('plannings', 'public');
 
             Planning::create([
                 'user_id' => Auth::id(),
@@ -128,15 +95,66 @@ class PlanningController extends Controller
                 'subject_id' => $request->subject_id,
             ]);
 
-            return redirect()->route('plannings.index')->with('success', 'Planificación subida exitosamente.');
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            // Limpieza compensatoria: eliminar el archivo si ya fue escrito
+            if ($path) {
+                Storage::disk('private_plannings')->delete($path);
+            }
+
+            // Registrar el error de forma segura en el servidor
+            Log::error('Error al subir planificación: '.$e->getMessage(), [
+                'user_id' => Auth::id(),
+                'subject_id' => $request->subject_id,
+            ]);
+
+            return redirect()->back()->with('error', 'No se pudo procesar la planificación. Inténtelo de nuevo o contacte con el administrador.');
         }
+
+        return redirect()->route('plannings.index')->with('success', 'Planificación subida exitosamente en almacenamiento privado.');
     }
 
     public function download(Planning $planning)
     {
         Gate::authorize('download', $planning);
 
-        return Storage::disk('public')->download($planning->file_path);
+        $disk = Storage::disk('private_plannings');
+
+        if (! $planning->file_path || ! $disk->exists($planning->file_path)) {
+            abort(404, 'El archivo de la planificación no existe o no fue encontrado.');
+        }
+
+        $extension = strtolower(pathinfo($planning->file_path, PATHINFO_EXTENSION));
+        $downloadName = Str::slug($planning->title).'.'.$extension;
+
+        return $disk->download($planning->file_path, $downloadName);
+    }
+
+    public function preview(Planning $planning)
+    {
+        Gate::authorize('view', $planning);
+
+        $disk = Storage::disk('private_plannings');
+
+        if (! $planning->file_path || ! $disk->exists($planning->file_path)) {
+            abort(404, 'El archivo de la planificación no existe o no fue encontrado.');
+        }
+
+        $extension = strtolower(pathinfo($planning->file_path, PATHINFO_EXTENSION));
+
+        if ($extension === 'pdf') {
+            return response()->file($disk->path($planning->file_path), [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.Str::slug($planning->title).'.pdf"',
+            ]);
+        }
+
+        // Para DOC y DOCX degradar a descarga
+        $downloadName = Str::slug($planning->title).'.'.$extension;
+
+        return $disk->download($planning->file_path, $downloadName);
     }
 
     public function view(Planning $planning)
@@ -180,7 +198,9 @@ class PlanningController extends Controller
     {
         Gate::authorize('delete', $planning);
 
-        Storage::disk('public')->delete($planning->file_path);
+        if ($planning->file_path) {
+            Storage::disk('private_plannings')->delete($planning->file_path);
+        }
 
         $planning->delete();
 

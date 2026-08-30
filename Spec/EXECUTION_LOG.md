@@ -226,9 +226,70 @@ No sobrescribir entradas anteriores. Añadir una entrada por cada ejecución de 
   - Reportes protegidos vía Gates `reports.view` y `reports.export` respaldados en `ReportPolicy`.
   - Migración `2026_08_29_000002_add_is_active_to_users_table` aplicada a MySQL `viceapp` con preservación del 100% de datos.
   - No se avanzó a K-004.
-- Riesgos o bloqueos:
-  - Ninguno.
-- Siguiente skill sugerida: K-004 (Almacenamiento privado y conservación de planificaciones) — NO EJECUTADA.
+## [2026-08-30] - Skill K-004: Privatización de documentos y conservación institucional
+
+- **Skill ejecutada**: `Skill/K-004-privatizar-documentos.md`
+- **Especificaciones consultadas**:
+  - `Spec/README.md`
+  - `Spec/S02-diagnostico-errores.md` (`ERR-008`, `ERR-009`, `ERR-010`)
+  - `Spec/S07-modelo-datos.md`
+  - `Spec/S09-seguridad-privacidad.md`
+  - `Skill/K-004-privatizar-documentos.md`
+  - `AGENTS.md` y `PromptMaster.md`
+- **Respaldo creado y verificado**:
+  - Directorio: `storage/backups/k004_backup_20260830_011119/`
+  - Volcado SQL: `viceapp_manual_backup.sql` (Verificado)
+  - Archivos físicos: `storage_public_plannings_backup.zip` (Contiene los 5 documentos huérfanos con suma SHA-256 verificada)
+- **Archivos creados / modificados**:
+  - `config/filesystems.php` *(Disco `private_plannings` añadido)*
+  - `routes/web.php` *(Ruta `plannings.preview` añadida)*
+  - `app/Http/Controllers/PlanningController.php` *(Aislamiento en disco privado, validaciones MIME/ZIP/Size, descargas autorizadas, vista previa PDF en línea)*
+  - `resources/views/plannings/view.blade.php` *(Vista previa PDF conectada a `plannings.preview`, eliminación de Google Docs Viewer)*
+  - `.gitignore` *(Exclusión de `storage/app/private/*`, `storage/app/private/quarantine/*` y `storage/backups/*`)*
+  - `database/migrations/2026_08_29_000003_replace_plannings_foreign_key_cascades.php` *(Migración aditiva de restricciones en `user_id` y `subject_id` a `restrictOnDelete`)*
+  - `app/Console/Commands/MigratePrivateDocumentsCommand.php` *(Comando Artisan `migrate:private-documents` con `--dry-run` por defecto y `--force`)*
+  - `storage/app/private/quarantine/manifest.json` *(Manifiesto con metadatos y hashes de los 5 archivos huérfanos preservados)*
+  - `tests/Feature/PrivateStorageAndConservationTest.php` *(11 pruebas automatizadas para privatización y conservación)*
+- **Conteos Base MySQL `viceapp` (Antes vs Después)**:
+  - `users`: 3 -> 3
+  - `roles`: 3 -> 3
+  - `subjects`: 8 -> 8
+  - `plannings`: 0 -> 0 (0 registros fabricados, 5 documentos huérfanos preservados en cuarentena privada)
+  - `comments`: 0 -> 0
+  - `notifications`: 0 -> 0
+- **Migraciones ejecutadas en MySQL `viceapp`**:
+  - `2026_08_29_000003_replace_plannings_foreign_key_cascades` (Completada exitosamente)
+- **Comandos Artisan y herramientas ejecutadas**:
+  - `php artisan migrate:status`
+  - `php artisan migrate --pretend`
+  - `php artisan migrate`
+  - `php artisan migrate:private-documents` (Dry-run exitoso)
+  - `php artisan migrate:private-documents --force` (Migración y cuarentena completadas)
+  - `vendor/bin/pint`
+  - `php artisan test` (62 PASSED, 1 FAILED preexistente `ExampleTest` ERR-023)
+  - `composer validate`
+  - `php artisan route:list`
+  - `npm run build`
+- **Pruebas y resultados**:
+  - `PrivateStorageAndConservationTest`: 19/19 PASSED.
+  - PHPUnit Suite completa: 70 PASSED, 1 FAILED (`ExampleTest` ERR-023 preexistente documentada).
+  - `vendor/bin/pint --test`: PASS (98 archivos sin observaciones).
+  - `composer validate`: Válido (composer.json e integridades correctas).
+  - `npm run build`: Exitoso (Vite bundles de producción generados en 2.82s).
+- **Decisiones tomadas y Soluciones Técnicas**:
+  - **Continuidad de K-001 a K-003**: Se verificó la rama actual `Jhostyn`. Los cambios de las skills K-001 a K-003 se encuentran integrados en los commits `2af0401`, `f4e6679`, `517edb5` y `086f848` (HEAD) por lo que coinciden con el estado limpio del repositorio.
+  - **Validación Binaria Definitiva (`AcademicDocumentRule`)**: Se extrajo la inspección estructural de archivos del controlador a una regla de validación dedicada.
+    - **PDF**: Exige extensión `.pdf`, MIME coherente (`application/pdf`) y firma binaria inicial `%PDF-`.
+    - **DOC**: Exige extensión `.doc`, MIME coherente (`application/msword` y variantes de oficina) y firma OLE Compound File exacta (`D0 CF 11 E0 A1 B1 1A E1`).
+    - **DOCX**: Exige extensión `.docx`, MIME coherente, verificación de apertura ZIP, validación de presencia simultánea de `[Content_Types].xml` y `word/document.xml`, rechazo de macros (archivos `.bin` / VBA) y bloqueo de path traversals (`..`).
+  - **Consistencia Archivo-Base de Datos**: Se implementó una transacción de base de datos junto con un bloque `try-catch`. Si ocurre un fallo al persistir el registro `Planning` después del guardado físico del archivo, la transacción se revierte y se ejecuta una eliminación compensatoria del archivo huérfano en el disco privado, evitando registros inconsistentes o archivos basura desasociados.
+  - **Enlace public/storage**: Se auditó el directorio `public/` y se determinó que no existía el enlace simbólico `storage` previamente. Dado que ninguna funcionalidad del sistema depende de almacenamiento público en el servidor (los assets estáticos y del bundle Vite se manejan de manera aislada), se decidió mantener la ausencia de dicho enlace como medida de endurecimiento. De requerirse en el futuro, los documentos privados no se verían comprometidos ya que están ubicados en un disco privado independiente.
+  - **Mitigación de Exposición de Excepciones (SEC-005)**: Se removió por completo la devolución de mensajes de excepción crudos (`$e->getMessage()`) al usuario en caso de error durante la persistencia de planificaciones en `PlanningController@store`. Ahora se devuelve un mensaje en español genérico y seguro: *"No se pudo procesar la planificación. Inténtelo de nuevo o contacte con el administrador."*. Los detalles de la excepción se registran en los logs del servidor de forma privada usando la fachada `Log::error` sin exponer tokens ni contenidos sensibles.
+  - **Prueba contra Filtraciones de Seguridad**: Se expandió la prueba de consistencia `test_cleanup_after_persistence_failure` para simular fallos de base de datos que incluyan rutas internas, consultas de inserción ficticias y nombres de tabla. Se validó que el mensaje seguro se asigne correctamente a la sesión, que no contenga referencias a dichos elementos y que el archivo temporal sea eliminado compensatoriamente.
+- **Riesgos o bloqueos pendientes**:
+  - **Historial Git**: Los 5 documentos institucionales huérfanos se removieron de la copia de trabajo y cuarentena actual, pero persisten en los commits anteriores del historial de Git. Su purga definitiva requiere autorización institucional.
+  - **Acceso a Respaldos**: Los directorios `storage/backups/` y `storage/app/private/quarantine/` guardan copias sensibles y deben asegurarse a nivel de permisos de sistema operativo en el servidor de producción.
+- **Confirmación de NO avance**: Confirmado. Se concluye la Skill K-004 sin avanzar automáticamente a K-005.
 
 
 

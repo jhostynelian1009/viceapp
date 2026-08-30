@@ -16,7 +16,7 @@ class UserSeeder extends Seeder
     public function run()
     {
         // Solo crear usuarios demo en entorno local o de pruebas
-        if (!app()->environment(['local', 'testing'])) {
+        if (! app()->environment(['local', 'testing'])) {
             return;
         }
 

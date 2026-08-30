@@ -26,6 +26,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     // Rutas Generales de Planificaciones (Protección fina en Controller / Policy)
     Route::resource('plannings', PlanningController::class)->except(['create', 'show', 'edit', 'update']);
     Route::get('/plannings/{planning}/download', [PlanningController::class, 'download'])->name('plannings.download');
+    Route::get('/plannings/{planning}/preview', [PlanningController::class, 'preview'])->name('plannings.preview');
     Route::get('/plannings/{planning}/view', [PlanningController::class, 'view'])->name('plannings.view');
     Route::patch('/plannings/{planning}/status', [PlanningController::class, 'updateStatus'])->name('plannings.updateStatus');
 

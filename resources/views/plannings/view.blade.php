@@ -51,14 +51,7 @@
                         <div class="mt-6 border-t pt-6">
                             <div class="flex justify-between items-center mb-4">
                                 <h4 class="text-xl font-bold text-gray-800">Visualizador de Documento</h4>
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-sm text-gray-600">Visor Integrado</span>
-                                    <label for="viewer-toggle" class="inline-flex relative items-center cursor-pointer">
-                                        <input type="checkbox" id="viewer-toggle" class="sr-only peer">
-                                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:bg-blue-600"></div>
-                                        <span class="ml-3 text-sm font-medium text-gray-900">Google Docs</span>
-                                    </label>
-                                </div>
+                                <span class="text-sm text-gray-600">Almacenamiento Privado Seguro</span>
                             </div>
 
                             @php
@@ -67,22 +60,17 @@
 
                             @if($fileExtension === 'pdf')
                                 <div class="bg-gray-100 p-2 rounded-lg">
-                                    <iframe src="{{ Storage::url($planning->file_path) }}" style="width:100%; height:700px;" frameborder="0"></iframe>
+                                    <iframe src="{{ route('plannings.preview', $planning) }}" style="width:100%; height:700px;" frameborder="0"></iframe>
                                 </div>
                             @elseif(in_array($fileExtension, ['doc', 'docx']))
                                 <div id="mammoth-viewer">
                                     <div id="loading-indicator" class="text-center p-8">
-                                        <p class="text-lg font-semibold mb-2">Cargando vista previa...</p>
+                                        <p class="text-lg font-semibold mb-2">Cargando vista previa local...</p>
                                         <div class="w-full bg-gray-200 rounded-full h-2.5">
                                             <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full w-0 transition-all duration-500 ease-linear"></div>
                                         </div>
                                     </div>
                                     <div id="word-content" class="bg-gray-50 p-4 rounded-lg prose max-w-none border hidden"></div>
-                                </div>
-                                <div id="google-viewer" class="hidden">
-                                    <div class="bg-gray-100 p-2 rounded-lg">
-                                        <iframe src="https://docs.google.com/gview?url={{ url(Storage::url($planning->file_path)) }}&embedded=true" style="width:100%; height:700px;" frameborder="0"></iframe>
-                                    </div>
                                 </div>
                             @else
                                 <div class="bg-gray-100 text-gray-600 p-4 rounded-lg">
@@ -173,15 +161,6 @@
         <script>
             if (document.getElementById('mammoth-viewer')) {
                 document.addEventListener('DOMContentLoaded', () => {
-                    const mammothViewer = document.getElementById('mammoth-viewer');
-                    const googleViewer = document.getElementById('google-viewer');
-                    const toggle = document.getElementById('viewer-toggle');
-
-                    toggle.addEventListener('change', () => {
-                        mammothViewer.classList.toggle('hidden');
-                        googleViewer.classList.toggle('hidden');
-                    });
-
                     const wordContent = document.getElementById('word-content');
                     const loadingIndicator = document.getElementById('loading-indicator');
                     const progressBar = document.getElementById('progress-bar');

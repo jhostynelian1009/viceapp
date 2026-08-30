@@ -41,6 +41,12 @@ return [
             'root' => storage_path('app/private'),
         ],
 
+        'private_plannings' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/plannings'),
+            'throw' => true,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
