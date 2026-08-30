@@ -10,6 +10,7 @@ class SubjectController extends Controller
     public function index()
     {
         $subjects = Subject::all();
+
         return view('subjects.index', compact('subjects'));
     }
 
@@ -38,7 +39,7 @@ class SubjectController extends Controller
     public function update(Request $request, Subject $subject)
     {
         $request->validate([
-            'name' => 'required|string|max:255|unique:subjects,name,' . $subject->id,
+            'name' => 'required|string|max:255|unique:subjects,name,'.$subject->id,
         ]);
 
         $subject->update($request->all());

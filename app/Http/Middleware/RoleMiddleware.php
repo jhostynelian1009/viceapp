@@ -14,19 +14,21 @@ class RoleMiddleware
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      * @param  string  ...$roles
-     * @return \Symfony\Component\HttpFoundation\Response
      */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        if (!Auth::check()) {
+        if (! Auth::check()) {
             return redirect('login');
         }
 
         $user = Auth::user();
 
         foreach ($roles as $role) {
-            if ($user->hasRole($role)) {
-                return $next($request);
+            $subRoles = explode('|', $role);
+            foreach ($subRoles as $r) {
+                if ($user->hasRole(trim($r))) {
+                    return $next($request);
+                }
             }
         }
 

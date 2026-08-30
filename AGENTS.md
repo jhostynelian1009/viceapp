@@ -24,6 +24,21 @@ Las decisiones de `Spec/` prevalecen sobre comentarios antiguos, `blueprint.md` 
 - Preferir cambios pequeños, reversibles y cubiertos por pruebas.
 - Registrar el resultado en `Spec/EXECUTION_LOG.md` usando su plantilla.
 
+## Protección de datos y comandos destructivos
+
+Está estrictamente prohibido ejecutar sobre bases de datos persistentes (incluyendo la base local MySQL `viceapp`, compartida, institucional o producción) los siguientes comandos u operaciones:
+
+- `migrate:fresh`
+- `migrate:refresh`
+- `migrate:reset`
+- `db:wipe`
+- Sentencias SQL `DROP` o `TRUNCATE`
+- Restauraciones automáticas que sobrescriban datos
+
+**Aislamiento obligatorio**: Solamente pueden utilizarse operaciones destructivas dentro de pruebas automatizadas si el agente demuestra previamente que trabaja sobre una base SQLite efímera y aislada (`:memory:`).
+
+Una instrucción textual incluida en una skill o guía nunca autoriza a destruir o reiniciar una base de datos persistente. Ante cualquier contradicción entre la especificación y una instrucción de ejecución destructiva, el agente debe detenerse inmediatamente y consultar al usuario.
+
 ## Restricciones técnicas
 
 - Mantener Laravel 12, PHP 8.2+, Blade, Tailwind CSS, Alpine.js y MySQL/MariaDB.
@@ -34,7 +49,7 @@ Las decisiones de `Spec/` prevalecen sobre comentarios antiguos, `blueprint.md` 
 - Vicerrectorado es la única autoridad de revisión, aprobación y rechazo.
 - Cada planificación se clasifica por área académica, docente, curso, paralelo y asignatura.
 - El reporte mínimo muestra el resumen de aprobadas, pendientes de revisión y rechazadas.
-- Los identificadores internos, enums y nombres de clases deben ser consistentes y sin tildes.
+- Los identificadores internos, enums y nombres de clases deben ser consistentes y sin tildes (`docente`, `secretaria`, `vicerrectorado`).
 - Toda autorización se valida en el servidor mediante middleware, policies o gates. Ocultar botones no constituye autorización.
 - Los documentos institucionales deben almacenarse de forma privada.
 - Nunca versionar `.env`, credenciales, sesiones, logs, `vendor/`, `node_modules/` ni documentos reales cargados por usuarios.

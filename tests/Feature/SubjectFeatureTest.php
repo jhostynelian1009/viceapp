@@ -12,38 +12,58 @@ class SubjectFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_vicerrector_can_view_subjects_page()
+    protected function setUp(): void
     {
-        // Crear roles si no existen
-        $vicerrectorRole = Role::firstOrCreate(['name' => 'vicerrector']);
+        parent::setUp();
 
-        // Crear un usuario y asignarle el rol de vicerrector
-        $vicerrector = User::factory()->create();
-        $vicerrector->assignRole($vicerrectorRole);
+        Role::firstOrCreate(['name' => 'docente']);
+        Role::firstOrCreate(['name' => 'secretaria']);
+        Role::firstOrCreate(['name' => 'vicerrectorado']);
+    }
 
-        // Crear algunos subjects para la prueba
-        $subject1 = Subject::create(['name' => 'Matemáticas']);
-        $subject2 = Subject::create(['name' => 'Historia']);
+    public function test_vicerrectorado_and_secretaria_can_access_and_manage_subjects()
+    {
+        $vicerrector = User::factory()->create(['is_active' => true]);
+        $vicerrector->assignRole('vicerrectorado');
 
-        // Autenticar como el vicerrector
+        $secretaria = User::factory()->create(['is_active' => true]);
+        $secretaria->assignRole('secretaria');
+
+        $subject = Subject::create(['name' => 'Matemáticas']);
+
+        // Vicerrectorado access
         $this->actingAs($vicerrector);
+        $this->get(route('subjects.index'))->assertStatus(200)->assertSee('Matemáticas');
 
-        // Acceder a la página de índice de subjects
-        $response = $this->get(route('subjects.index'));
+        $this->post(route('subjects.store'), ['name' => 'Física'])->assertRedirect(route('subjects.index'));
+        $this->assertDatabaseHas('subjects', ['name' => 'Física']);
 
-        // Verificar que la respuesta es exitosa
-        $response->assertStatus(200);
+        // Secretaría access
+        $this->actingAs($secretaria);
+        $this->get(route('subjects.index'))->assertStatus(200)->assertSee('Física');
 
-        // Verificar que la vista correcta fue retornada
-        $response->assertViewIs('subjects.index');
+        $this->put(route('subjects.update', $subject), ['name' => 'Matemáticas Avanzadas'])->assertRedirect(route('subjects.index'));
+        $this->assertDatabaseHas('subjects', ['name' => 'Matemáticas Avanzadas']);
+    }
 
-        // Verificar que la vista tiene la variable 'subjects' y contiene los datos correctos
-        $response->assertViewHas('subjects', function ($subjects) use ($subject1, $subject2) {
-            return $subjects->contains($subject1) && $subjects->contains($subject2);
-        });
+    public function test_docente_cannot_access_subjects()
+    {
+        $docente = User::factory()->create(['is_active' => true]);
+        $docente->assignRole('docente');
 
-        // Verificar que el nombre de los subjects se muestra en la página
-        $response->assertSee($subject1->name);
-        $response->assertSee($subject2->name);
+        $this->actingAs($docente);
+
+        $this->get(route('subjects.index'))->assertStatus(403);
+        $this->post(route('subjects.store'), ['name' => 'Química'])->assertStatus(403);
+    }
+
+    public function test_user_without_role_cannot_access_subjects()
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $this->actingAs($user);
+
+        $this->get(route('subjects.index'))->assertStatus(403);
+        $this->post(route('subjects.store'), ['name' => 'Química'])->assertStatus(403);
     }
 }

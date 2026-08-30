@@ -5,16 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\Planning;
 use App\Models\Subject;
 use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Dompdf\Dompdf;
-use PhpOffice\PhpWord\PhpWord;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use PhpOffice\PhpWord\IOFactory;
+use PhpOffice\PhpWord\PhpWord;
 
 class ReportController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('reports.view');
+
         $reportData = null;
         $teachers = User::role('docente')->get();
         $subjects = Subject::all();
@@ -51,6 +53,8 @@ class ReportController extends Controller
 
     public function download(Request $request, $type)
     {
+        Gate::authorize('reports.export');
+
         $query = Planning::query();
 
         if ($request->filled('start_date') && $request->filled('end_date')) {
@@ -82,22 +86,23 @@ class ReportController extends Controller
 
     private function downloadPdf($data)
     {
-        $pdf = new Dompdf();
+        $pdf = new Dompdf;
         $pdf->loadHtml(view('reports.pdf', compact('data'))->render());
         $pdf->render();
+
         return $pdf->stream('report.pdf');
     }
 
     private function downloadWord($data)
     {
-        $phpWord = new PhpWord();
+        $phpWord = new PhpWord;
         $section = $phpWord->addSection();
         $section->addText('Reporte de Planificaciones', ['bold' => true, 'size' => 16]);
 
         $table = $section->addTable([
             'borderColor' => '000000',
-            'borderSize'  => 6,
-            'cellMargin'  => 50,
+            'borderSize' => 6,
+            'cellMargin' => 50,
         ]);
 
         $table->addRow();
@@ -111,7 +116,7 @@ class ReportController extends Controller
             $table->addCell()->addText($item->user->name ?? 'N/A');
             $table->addCell()->addText($item->subject->name ?? 'N/A');
             $table->addCell()->addText(ucfirst($item->status));
-            $table->addCell()->addText($item->created_at->format('d/m/Y'));
+            $table->addCell()->addText($item->created_at->format('d/m/Y H:i'));
         }
 
         $objWriter = IOFactory::createWriter($phpWord, 'Word2007');

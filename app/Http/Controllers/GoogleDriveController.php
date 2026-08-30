@@ -12,7 +12,7 @@ class GoogleDriveController extends Controller
 {
     public function connect()
     {
-        $client = new Client();
+        $client = new Client;
         $client->setClientId(config('google.client_id'));
         $client->setClientSecret(config('google.client_secret'));
         $client->setRedirectUri(config('google.redirect_uri'));
@@ -28,7 +28,7 @@ class GoogleDriveController extends Controller
 
     public function callback(Request $request)
     {
-        $client = new Client();
+        $client = new Client;
         $client->setClientId(config('google.client_id'));
         $client->setClientSecret(config('google.client_secret'));
         $client->setRedirectUri(config('google.redirect_uri'));
@@ -37,7 +37,8 @@ class GoogleDriveController extends Controller
             $token = $client->fetchAccessTokenWithAuthCode($request->code);
             $request->session()->put('google_drive_token', $token);
         } catch (\Exception $e) {
-            Log::error('Error al obtener el token de Google: ' . $e->getMessage());
+            Log::error('Error al obtener el token de Google: '.$e->getMessage());
+
             return redirect('/dashboard')->with('error', 'Hubo un error al conectar con Google Drive.');
         }
 
@@ -48,11 +49,11 @@ class GoogleDriveController extends Controller
     {
         $token = $request->session()->get('google_drive_token');
 
-        if (!$token) {
+        if (! $token) {
             return redirect()->route('google.connect')->with('error', 'Tu sesión de Google ha expirado. Por favor, conéctate de nuevo.');
         }
 
-        $client = new Client();
+        $client = new Client;
         $client->setAccessToken($token);
 
         if ($client->isAccessTokenExpired()) {
@@ -60,7 +61,7 @@ class GoogleDriveController extends Controller
                 $client->fetchAccessTokenWithRefreshToken($token['refresh_token']);
                 $request->session()->put('google_drive_token', $client->getAccessToken());
             } else {
-                 return redirect()->route('google.connect')->with('error', 'Tu sesión de Google ha expirado y no se pudo refrescar. Por favor, conéctate de nuevo.');
+                return redirect()->route('google.connect')->with('error', 'Tu sesión de Google ha expirado y no se pudo refrescar. Por favor, conéctate de nuevo.');
             }
         }
 

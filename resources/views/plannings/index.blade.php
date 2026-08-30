@@ -23,31 +23,27 @@
 
             <!-- Tarjetas de Acceso Rápido (Dinámicas por Rol) -->
             @auth
-                @php
-                    // Correct way to check for multiple roles
-                    $isAdmin = Auth::user()->hasRole('secretaria') || Auth::user()->hasRole('vicerrector');
-                @endphp
-
-                <div class="grid grid-cols-1 {{ $isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2' }} gap-8 mb-8">
-                    
-                    <!-- Card para Subir Planificación -->
-                    <a href="#upload-section" class="block transform hover:scale-105 transition-transform duration-300">
-                        <div class="bg-white overflow-hidden shadow-lg sm:rounded-2xl h-full flex flex-col justify-between">
-                            <div class="p-6">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 bg-red-100 p-3 rounded-full">
-                                        <svg class="h-8 w-8 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                                    </div>
-                                    <div class="ml-5">
-                                        <h4 class="text-xl font-semibold text-gray-800">Subir Planificación</h4>
-                                        <p class="mt-1 text-gray-500">Añade un nuevo documento para su revisión.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                    @can('create', App\Models\Planning::class)
+                        <!-- Card para Subir Planificación -->
+                        <a href="#upload-section" class="block transform hover:scale-105 transition-transform duration-300">
+                            <div class="bg-white overflow-hidden shadow-lg sm:rounded-2xl h-full flex flex-col justify-between">
+                                <div class="p-6">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 bg-red-100 p-3 rounded-full">
+                                            <svg class="h-8 w-8 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                        </div>
+                                        <div class="ml-5">
+                                            <h4 class="text-xl font-semibold text-gray-800">Subir Planificación</h4>
+                                            <p class="mt-1 text-gray-500">Añade un nuevo documento para su revisión.</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </a>
+                        </a>
+                    @endcan
 
-                    <!-- Card para Ver Mis Planificaciones -->
+                    <!-- Card para Ver Mis Planificaciones / Listado -->
                     <a href="#plannings-list" class="block transform hover:scale-105 transition-transform duration-300">
                         <div class="bg-white overflow-hidden shadow-lg sm:rounded-2xl h-full flex flex-col justify-between">
                             <div class="p-6">
@@ -56,16 +52,16 @@
                                         <svg class="h-8 w-8 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11h10M7 15h5" /></svg>
                                     </div>
                                     <div class="ml-5">
-                                        <h4 class="text-xl font-semibold text-gray-800">Gestionar Mis Documentos</h4>
-                                        <p class="mt-1 text-gray-500">Revisa, filtra y gestiona tus planificaciones.</p>
+                                        <h4 class="text-xl font-semibold text-gray-800">Gestionar Documentos</h4>
+                                        <p class="mt-1 text-gray-500">Revisa, filtra y gestiona planificaciones.</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </a>
 
-                    @if($isAdmin)
-                        <!-- Card para Revisar Planificaciones (Solo Admins) -->
+                    @can('review', App\Models\Planning::class)
+                        <!-- Card para Revisar Planificaciones (Solo Vicerrectorado) -->
                         <a href="{{ route('plannings.review') }}" class="block transform hover:scale-105 transition-transform duration-300">
                             <div class="bg-white overflow-hidden shadow-lg sm:rounded-2xl h-full flex flex-col justify-between border-2 border-blue-500">
                                 <div class="p-6">
@@ -81,69 +77,71 @@
                                 </div>
                             </div>
                         </a>
-                    @endif
+                    @endcan
                 </div>
             @endauth
 
-            <!-- Sección para Subir Nueva Planificación -->
-            <div id="upload-section" class="pt-8">
-                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6 text-gray-900">
-                        <h3 class="text-2xl font-bold text-gray-800 mb-4">Subir Nueva Planificación</h3>
-                        @if(session('success'))
-                            <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-                                <span class="block sm:inline">{{ session('success') }}</span>
-                            </div>
-                        @endif
-                        @if(session('error'))
-                            <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                                <span class="block sm:inline">{{ session('error') }}</span>
-                            </div>
-                        @endif
+            @can('create', App\Models\Planning::class)
+                <!-- Sección para Subir Nueva Planificación (Docentes) -->
+                <div id="upload-section" class="pt-8">
+                     <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        <div class="p-6 text-gray-900">
+                            <h3 class="text-2xl font-bold text-gray-800 mb-4">Subir Nueva Planificación</h3>
+                            @if(session('success'))
+                                <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                                    <span class="block sm:inline">{{ session('success') }}</span>
+                                </div>
+                            @endif
+                            @if(session('error'))
+                                <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                                    <span class="block sm:inline">{{ session('error') }}</span>
+                                </div>
+                            @endif
 
-                        <form action="{{ route('plannings.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
-                            @csrf
-                            <div>
-                                <x-input-label for="title" :value="__('Título de la Planificación')" class="text-base"/>
-                                <x-text-input id="title" class="block mt-2 w-full" type="text" name="title" :value="old('title')" required autofocus />
-                                <x-input-error :messages="$errors->get('title')" class="mt-2" />
-                            </div>
+                            <form action="{{ route('plannings.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                                @csrf
+                                <div>
+                                    <x-input-label for="title" :value="__('Título de la Planificación')" class="text-base"/>
+                                    <x-text-input id="title" class="block mt-2 w-full" type="text" name="title" :value="old('title')" required autofocus />
+                                    <x-input-error :messages="$errors->get('title')" class="mt-2" />
+                                </div>
 
-                            <div>
-                                <x-input-label for="subject_id" :value="__('Área Académica')" class="text-base"/>
-                                <select id="subject_id" name="subject_id" class="block mt-2 w-full border-gray-300 focus:border-red-500 focus:ring-red-500 rounded-md shadow-sm" required>
-                                    <option value="">Seleccione un área</option>
-                                    @foreach($subjects as $subject)
-                                        <option value="{{ $subject->id }}" {{ old('subject_id') == $subject->id ? 'selected' : '' }}>
-                                            {{ $subject->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('subject_id')" class="mt-2" />
-                            </div>
+                                <div>
+                                    <x-input-label for="subject_id" :value="__('Área Académica')" class="text-base"/>
+                                    <select id="subject_id" name="subject_id" class="block mt-2 w-full border-gray-300 focus:border-red-500 focus:ring-red-500 rounded-md shadow-sm" required>
+                                        <option value="">Seleccione un área</option>
+                                        @foreach($subjects as $subject)
+                                            <option value="{{ $subject->id }}" {{ old('subject_id') == $subject->id ? 'selected' : '' }}>
+                                                {{ $subject->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('subject_id')" class="mt-2" />
+                                </div>
 
-                            <div>
-                                <x-input-label for="file" :value="__('Archivo (PDF, DOC, DOCX)')" class="text-base"/>
-                                <input id="file" class="block mt-2 w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none" type="file" name="file" required />
-                                <p class="mt-1 text-sm text-gray-500">Tamaño máximo: 10MB.</p>
-                                <x-input-error :messages="$errors->get('file')" class="mt-2" />
-                            </div>
+                                <div>
+                                    <x-input-label for="file" :value="__('Archivo (PDF, DOC, DOCX)')" class="text-base"/>
+                                    <input id="file" class="block mt-2 w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none" type="file" name="file" required />
+                                    <p class="mt-1 text-sm text-gray-500">Tamaño máximo: 10MB.</p>
+                                    <x-input-error :messages="$errors->get('file')" class="mt-2" />
+                                </div>
 
-                            <div class="flex items-center justify-end pt-4">
-                                <button type="submit" class="px-6 py-2 bg-red-600 text-white font-bold rounded-md hover:bg-red-700 transition-colors">
-                                    {{ __('Subir Planificación') }}
-                                </button>
-                            </div>
-                        </form>
+                                <div class="flex items-center justify-end pt-4">
+                                    <button type="submit" class="px-6 py-2 bg-red-600 text-white font-bold rounded-md hover:bg-red-700 transition-colors">
+                                        {{ __('Subir Planificación') }}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
-            </div>
+            @endcan
 
-            <!-- Sección de Mis Planificaciones -->
+            <!-- Sección de Listado de Planificaciones -->
             <div id="plannings-list" class="mt-12 pt-8">
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6 text-gray-900">
-                        <h3 class="text-2xl font-bold text-gray-800 mb-6">Mis Planificaciones</h3>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-6">Listado de Planificaciones</h3>
 
                         <form action="{{ route('plannings.index') }}" method="GET" class="mb-6">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -174,6 +172,7 @@
                                 <thead class="bg-gray-50">
                                     <tr>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Docente</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Área Académica</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Subida</th>
@@ -184,6 +183,7 @@
                                     @forelse ($plannings as $planning)
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{{ $planning->title }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $planning->user->name ?? 'N/A' }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $planning->subject->name ?? 'N/A' }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                                 <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -198,29 +198,35 @@
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $planning->created_at->format('d/m/Y H:i') }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <a href="{{ route('plannings.view', $planning) }}" class="text-red-600 hover:text-red-800 font-semibold">Ver Detalles</a>
+                                                @can('view', $planning)
+                                                    <a href="{{ route('plannings.view', $planning) }}" class="text-red-600 hover:text-red-800 font-semibold">Ver Detalles</a>
+                                                @endcan
 
-                                                @if($planning->status == 'borrador' || $planning->status == 'rechazado')
+                                                @can('submit', $planning)
                                                     <form action="{{ route('plannings.updateStatus', $planning) }}" method="POST" class="inline-block ml-4">
                                                         @csrf
                                                         @method('PATCH')
                                                         <input type="hidden" name="status" value="revisión">
                                                         <button type="submit" class="text-blue-600 hover:text-blue-800 font-semibold">Enviar a Revisión</button>
                                                     </form>
-                                                @endif
+                                                @endcan
 
-                                                @if($planning->status == 'borrador')
+                                                @can('delete', $planning)
                                                     <form action="{{ route('plannings.destroy', $planning) }}" method="POST" class="inline-block ml-4" onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta planificación? Esta acción no se puede deshacer.');">
                                                         @csrf
                                                         @method('DELETE')
                                                         <button type="submit" class="text-gray-600 hover:text-gray-800 font-semibold">Eliminar</button>
                                                     </form>
-                                                @endif
+                                                @endcan
+
+                                                @cannot('view', $planning)
+                                                    <span class="text-gray-400 italic text-xs">Sin acciones académicas</span>
+                                                @endcannot
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="5" class="px-6 py-12 whitespace-nowrap text-sm text-gray-500 text-center">
+                                            <td colspan="6" class="px-6 py-12 whitespace-nowrap text-sm text-gray-500 text-center">
                                                 <p>No se encontraron planificaciones con los criterios de búsqueda.</p>
                                             </td>
                                         </tr>

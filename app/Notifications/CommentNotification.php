@@ -38,9 +38,9 @@ class CommentNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-                    ->line('Hay un nuevo comentario en tu planificación.')
-                    ->action('Ver Planificación', route('plannings.view', $this->comment->planning_id))
-                    ->line('¡Gracias por usar nuestra aplicación!');
+            ->line('Hay un nuevo comentario en tu planificación.')
+            ->action('Ver Planificación', route('plannings.view', $this->comment->planning_id))
+            ->line('¡Gracias por usar nuestra aplicación!');
     }
 
     /**

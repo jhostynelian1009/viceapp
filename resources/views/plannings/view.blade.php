@@ -128,7 +128,7 @@
                     </div>
                 </div>
                 @auth
-                    @if( (Auth::user()->hasRole('secretaria') || Auth::user()->hasRole('vicerrector')) && $planning->status === 'revisión' )
+                    @if( (Auth::user()->hasRole('secretaria') || Auth::user()->hasRole('vicerrectorado')) && $planning->status === 'revisión' )
                         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg border-t-4 border-blue-500">
                             <div class="p-6">
                                 <h4 class="text-xl font-bold text-gray-800 mb-4">Panel de Gestión</h4>

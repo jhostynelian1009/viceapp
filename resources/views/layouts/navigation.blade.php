@@ -12,7 +12,7 @@
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
-                    @hasanyrole('secretaria|vicerrector')
+                    @hasanyrole('secretaria|vicerrectorado')
                         <x-nav-link :href="route('plannings.review')" :active="request()->routeIs('plannings.review')">
                             {{ __('Planificaciones') }}
                         </x-nav-link>
@@ -22,7 +22,7 @@
                             {{ __('Mis Planificaciones') }}
                         </x-nav-link>
                     @endrole
-                    @role('vicerrector')
+                    @role('vicerrectorado')
                         <x-nav-link :href="route('subjects.index')" :active="request()->routeIs('subjects.index')">
                             {{ __('Áreas Académicas') }}
                         </x-nav-link>
@@ -85,7 +85,7 @@
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
-            @hasanyrole('secretaria|vicerrector')
+            @hasanyrole('secretaria|vicerrectorado')
                 <x-responsive-nav-link :href="route('plannings.review')" :active="request()->routeIs('plannings.review')">
                     {{ __('Planificaciones') }}
                 </x-responsive-nav-link>
@@ -95,7 +95,7 @@
                     {{ __('Mis Planificaciones') }}
                 </x-responsive-nav-link>
             @endrole
-            @role('vicerrector')
+            @role('vicerrectorado')
                 <x-responsive-nav-link :href="route('subjects.index')" :active="request()->routeIs('subjects.index')">
                     {{ __('Áreas Académicas') }}
                 </x-responsive-nav-link>

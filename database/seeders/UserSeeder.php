@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\User;
+use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 
 class UserSeeder extends Seeder
@@ -15,33 +15,50 @@ class UserSeeder extends Seeder
      */
     public function run()
     {
+        // Solo crear usuarios demo en entorno local o de pruebas
+        if (!app()->environment(['local', 'testing'])) {
+            return;
+        }
+
         // Crear roles si no existen
-        $docenteRole = Role::firstOrCreate(['name' => 'docente']);
-        $secretariaRole = Role::firstOrCreate(['name' => 'secretaria']);
-        $vicerrectorRole = Role::firstOrCreate(['name' => 'vicerrector']);
+        $docenteRole = Role::firstOrCreate(['name' => 'docente', 'guard_name' => 'web']);
+        $secretariaRole = Role::firstOrCreate(['name' => 'secretaria', 'guard_name' => 'web']);
+        $vicerrectorRole = Role::firstOrCreate(['name' => 'vicerrectorado', 'guard_name' => 'web']);
 
-        // Crear usuario docente
-        $docente = User::create([
-            'name' => 'Usuario Docente',
-            'email' => 'docente@example.com',
-            'password' => bcrypt('password'),
-        ]);
-        $docente->assignRole($docenteRole);
+        // Crear o actualizar usuario docente
+        $docente = User::firstOrCreate(
+            ['email' => 'docente@example.com'],
+            [
+                'name' => 'Usuario Docente',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+                'is_active' => true,
+            ]
+        );
+        $docente->syncRoles([$docenteRole]);
 
-        // Crear usuario secretaria
-        $secretaria = User::create([
-            'name' => 'Usuario Secretaria',
-            'email' => 'secretaria@example.com',
-            'password' => bcrypt('password'),
-        ]);
-        $secretaria->assignRole($secretariaRole);
+        // Crear o actualizar usuario secretaria
+        $secretaria = User::firstOrCreate(
+            ['email' => 'secretaria@example.com'],
+            [
+                'name' => 'Usuario Secretaria',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+                'is_active' => true,
+            ]
+        );
+        $secretaria->syncRoles([$secretariaRole]);
 
-        // Crear usuario vicerrector
-        $vicerrector = User::create([
-            'name' => 'Usuario Vicerrector',
-            'email' => 'vicerrector@example.com',
-            'password' => bcrypt('password'),
-        ]);
-        $vicerrector->assignRole($vicerrectorRole);
+        // Crear o actualizar usuario vicerrector
+        $vicerrector = User::firstOrCreate(
+            ['email' => 'vicerrector@example.com'],
+            [
+                'name' => 'Usuario Vicerrector',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+                'is_active' => true,
+            ]
+        );
+        $vicerrector->syncRoles([$vicerrectorRole]);
     }
 }

@@ -8,6 +8,7 @@ use Google\Client;
 use Google\Service\Drive;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -16,10 +17,17 @@ class PlanningController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Planning::with('subject')->where('user_id', Auth::id());
+        Gate::authorize('viewAny', Planning::class);
+
+        $user = Auth::user();
+        $query = Planning::with('user', 'subject');
+
+        if ($user->hasRole('docente')) {
+            $query->where('user_id', $user->id);
+        }
 
         if ($request->has('search') && $request->input('search') != '') {
-            $query->where('title', 'like', '%' . $request->input('search') . '%');
+            $query->where('title', 'like', '%'.$request->input('search').'%');
         }
 
         if ($request->has('status') && $request->input('status') != '') {
@@ -34,6 +42,8 @@ class PlanningController extends Controller
 
     public function review(Request $request)
     {
+        Gate::authorize('review', Planning::class);
+
         $plannings = Planning::with('user', 'subject')
             ->where('status', 'revisión')
             ->latest()
@@ -44,25 +54,27 @@ class PlanningController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('create', Planning::class);
+
         // Flujo para archivos de Google Drive
         if ($request->has('google_drive_file_id')) {
             $request->validate([
                 'title' => 'required|string|max:255',
                 'google_drive_file_id' => 'required|string',
-                'subject_id' => 'required|exists:subjects,id', // Validación añadida
+                'subject_id' => 'required|exists:subjects,id',
             ]);
 
             try {
                 $token = $request->session()->get('google_drive_token');
-                if (!$token) {
+                if (! $token) {
                     return redirect()->route('google.connect')->with('error', 'Por favor, conecta tu cuenta de Google Drive primero.');
                 }
 
-                $client = new Client();
+                $client = new Client;
                 $client->setAccessToken($token);
 
                 if ($client->isAccessTokenExpired()) {
-                     if (isset($token['refresh_token'])) {
+                    if (isset($token['refresh_token'])) {
                         $client->fetchAccessTokenWithRefreshToken($token['refresh_token']);
                         $request->session()->put('google_drive_token', $client->getAccessToken());
                     } else {
@@ -75,27 +87,28 @@ class PlanningController extends Controller
 
                 $fileMetadata = $driveService->files->get($fileId, ['fields' => 'name']);
                 $originalFileName = $fileMetadata->name;
-                
+
                 $fileContent = $driveService->files->get($fileId, ['alt' => 'media']);
-                
+
                 $extension = pathinfo($originalFileName, PATHINFO_EXTENSION) ?: 'docx';
-                $newFileName = Str::slug(pathinfo($originalFileName, PATHINFO_FILENAME)) . '_' . Str::random(10) . '.' . $extension;
-                $path = 'plannings/' . $newFileName;
-                
+                $newFileName = Str::slug(pathinfo($originalFileName, PATHINFO_FILENAME)).'_'.Str::random(10).'.'.$extension;
+                $path = 'plannings/'.$newFileName;
+
                 Storage::disk('public')->put($path, $fileContent->getBody()->getContents());
 
                 Planning::create([
                     'user_id' => Auth::id(),
                     'title' => $request->title,
                     'file_path' => $path,
-                    'subject_id' => $request->subject_id, // Guardado del subject_id
+                    'subject_id' => $request->subject_id,
                 ]);
 
                 return redirect()->route('plannings.index')->with('success', 'Planificación creada desde Google Drive exitosamente.');
 
             } catch (\Exception $e) {
-                Log::error("Fallo en la descarga de Google Drive: " . $e->getMessage());
-                return redirect()->back()->with('error', 'No se pudo descargar el archivo de Google Drive. Detalle: ' . $e->getMessage());
+                Log::error('Fallo en la descarga de Google Drive: '.$e->getMessage());
+
+                return redirect()->back()->with('error', 'No se pudo descargar el archivo de Google Drive. Detalle: '.$e->getMessage());
             }
 
         } else {
@@ -121,21 +134,18 @@ class PlanningController extends Controller
 
     public function download(Planning $planning)
     {
-        $user = Auth::user();
-        if ($user->hasRole('secretaria') || $user->hasRole('vicerrector') || $planning->user_id === $user->id) {
-            return Storage::disk('public')->download($planning->file_path);
-        }
-        abort(403, 'Acción no autorizada.');
+        Gate::authorize('download', $planning);
+
+        return Storage::disk('public')->download($planning->file_path);
     }
 
     public function view(Planning $planning)
     {
-        $user = Auth::user();
-        if ($user->hasRole('secretaria') || $user->hasRole('vicerrector') || $planning->user_id === $user->id) {
-            $planning->load('comments.user', 'subject');
-            return view('plannings.view', compact('planning'));
-        }
-        abort(403, 'Página no encontrada o sin permisos de acceso.');
+        Gate::authorize('view', $planning);
+
+        $planning->load('comments.user', 'subject');
+
+        return view('plannings.view', compact('planning'));
     }
 
     public function updateStatus(Request $request, Planning $planning)
@@ -144,22 +154,21 @@ class PlanningController extends Controller
             'status' => 'required|in:borrador,revisión,aprobado,rechazado',
         ]);
 
-        $user = Auth::user();
-        $currentStatus = $planning->status;
         $newStatus = $request->status;
-        $redirectRoute = 'plannings.review'; 
 
-        if ($user->hasRole('docente')) {
-            if (!(($currentStatus === 'borrador' && $newStatus === 'revisión') || ($currentStatus === 'rechazado' && $newStatus === 'revisión'))) {
-                abort(403, 'Como docente, solo puedes enviar a revisión un borrador o un documento rechazado.');
-            }
-            $redirectRoute = 'plannings.index'; 
-        } elseif ($user->hasRole('secretaria') || $user->hasRole('vicerrector')) {
-            if ($currentStatus !== 'revisión') {
-                abort(403, 'Solo puedes aprobar o rechazar planificaciones que estén en estado de revisión.');
-            }
+        if ($newStatus === 'revisión') {
+            Gate::authorize('submit', $planning);
+            $redirectRoute = 'plannings.index';
+        } elseif ($newStatus === 'aprobado') {
+            Gate::authorize('approve', $planning);
+            $redirectRoute = 'plannings.review';
+        } elseif ($newStatus === 'rechazado') {
+            Gate::authorize('reject', $planning);
+            $redirectRoute = 'plannings.review';
         } else {
-            abort(403, 'No tienes permisos para cambiar el estado de esta planificación.');
+            // Re-draft or invalid status transition
+            Gate::authorize('update', $planning);
+            $redirectRoute = 'plannings.index';
         }
 
         $planning->update(['status' => $newStatus]);
@@ -169,9 +178,7 @@ class PlanningController extends Controller
 
     public function destroy(Planning $planning)
     {
-        if (Auth::id() !== $planning->user_id || $planning->status !== 'borrador') {
-            abort(403, 'No tienes permiso para eliminar esta planificación.');
-        }
+        Gate::authorize('delete', $planning);
 
         Storage::disk('public')->delete($planning->file_path);
 

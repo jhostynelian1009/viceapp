@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class SubjectSeeder extends Seeder
@@ -20,7 +19,7 @@ class SubjectSeeder extends Seeder
             'Educación Física',
             'Educación Cultural y Artística',
             'Inglés',
-            'Informática'
+            'Informática',
         ];
 
         foreach ($subjects as $subject) {

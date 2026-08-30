@@ -32,7 +32,7 @@
                     </div>
                 </a>
 
-                @if(Auth::user()->hasRole('secretaria') || Auth::user()->hasRole('vicerrector'))
+                @if(Auth::user()->hasRole('secretaria') || Auth::user()->hasRole('vicerrectorado'))
                     <!-- Tarjeta de Docentes (Solo para Secretaria y Vicerrector) -->
                     <a href="{{ route('teachers.index') }}" class="block bg-white overflow-hidden shadow-sm sm:rounded-lg transform hover:scale-105 transition-transform duration-300">
                         <div class="p-6 text-center">

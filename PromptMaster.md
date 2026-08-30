@@ -50,7 +50,11 @@ Spec/EXECUTION_LOG.md. No hagas commit, push ni merge.
 - Seguridad y conservación documental antes que nuevas pantallas.
 - Autorización del lado del servidor para cada operación.
 - Historial institucional inmutable; desactivar antes que borrar.
-- Migraciones reversibles y sin pérdida silenciosa de datos.
+- **Tratamiento de Migraciones**:
+  - Las migraciones deben ser reversibles cuando sea técnicamente seguro.
+  - Una migración que consolida datos históricos y no puede reconstruir el estado original no debe fingir reversibilidad.
+  - En esos casos, el método `down()` debe bloquear explícitamente la reversión (p. ej. lanzando una excepción clara) o requerir una restauración controlada desde un respaldo de seguridad.
+  - Toda migración irreversible requiere documentación explícita, respaldo previo en entornos con datos y autorización previa antes de ejecutarse.
 - Reglas de negocio verificadas con pruebas.
 - Una skill por ejecución.
 - Toda decisión institucional desconocida se documenta y se bloquea; no se inventa.

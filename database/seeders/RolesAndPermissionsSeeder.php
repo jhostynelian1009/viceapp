@@ -2,10 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -18,8 +16,8 @@ class RolesAndPermissionsSeeder extends Seeder
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         // create roles
-        Role::firstOrCreate(['name' => 'Docente']);
-        Role::firstOrCreate(['name' => 'Secretaría']);
-        Role::firstOrCreate(['name' => 'Vicerrector']);
+        Role::firstOrCreate(['name' => 'docente', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'secretaria', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'vicerrectorado', 'guard_name' => 'web']);
     }
 }
