@@ -2,8 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\AcademicArea;
+use App\Models\Course;
+use App\Models\Parallel;
 use App\Models\Planning;
 use App\Models\Subject;
+use App\Models\TeachingAssignment;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,7 +28,15 @@ class PrivateStorageAndConservationTest extends TestCase
 
     protected User $vicerrectorado;
 
+    protected AcademicArea $area;
+
     protected Subject $subject;
+
+    protected Course $course;
+
+    protected Parallel $parallel;
+
+    protected TeachingAssignment $assignment;
 
     protected function setUp(): void
     {
@@ -44,9 +56,22 @@ class PrivateStorageAndConservationTest extends TestCase
         $this->vicerrectorado = User::factory()->create(['is_active' => true]);
         $this->vicerrectorado->assignRole('vicerrectorado');
 
+        $this->area = AcademicArea::create(['name' => 'General', 'code' => 'GEN', 'is_active' => true]);
         $this->subject = Subject::create([
             'name' => 'Matemáticas',
             'code' => 'MAT-101',
+            'academic_area_id' => $this->area->id,
+            'is_active' => true,
+        ]);
+        $this->course = Course::create(['name' => '1er Año', 'is_active' => true]);
+        $this->parallel = Parallel::create(['name' => 'A', 'is_active' => true]);
+
+        $this->assignment = TeachingAssignment::create([
+            'teacher_id' => $this->docente->id,
+            'subject_id' => $this->subject->id,
+            'course_id' => $this->course->id,
+            'parallel_id' => $this->parallel->id,
+            'is_active' => true,
         ]);
     }
 
@@ -110,9 +135,9 @@ class PrivateStorageAndConservationTest extends TestCase
         return new UploadedFile($tempPath, $filename, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', null, true);
     }
 
-    protected function createZipFileWithMacros(string $filename = 'macros.docx'): UploadedFile
+    protected function createZipFileWithMacros(string $filename = 'macro.docx'): UploadedFile
     {
-        $tempPath = sys_get_temp_dir().'/'.uniqid('docx_').'.docx';
+        $tempPath = sys_get_temp_dir().'/'.uniqid('macro_').'.docx';
         $zip = new \ZipArchive;
         $zip->open($tempPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
         $zip->addFromString('[Content_Types].xml', '<?xml version="1.0"?><Types></Types>');
@@ -145,7 +170,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $response = $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Planificación Semanal PDF',
             'file' => $pdf,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response->assertRedirect(route('plannings.index'));
@@ -168,7 +195,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $response = $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Planificación Invalida',
             'file' => $pdf,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response->assertSessionHasErrors(['file']);
@@ -184,7 +213,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $response = $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Planificación Semanal DOC',
             'file' => $doc,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response->assertRedirect(route('plannings.index'));
@@ -203,7 +234,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $response = $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Planificación Invalida DOC',
             'file' => $doc,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response->assertSessionHasErrors(['file']);
@@ -220,7 +253,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $response = $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Planificación DOCX',
             'file' => $docx,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response->assertRedirect(route('plannings.index'));
@@ -234,7 +269,6 @@ class PrivateStorageAndConservationTest extends TestCase
     {
         Storage::fake('private_plannings');
 
-        // Create fake zip without word/document.xml
         $tempPath = sys_get_temp_dir().'/'.uniqid('fake_').'.zip';
         $zip = new \ZipArchive;
         $zip->open($tempPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
@@ -246,7 +280,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $response = $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Fake DOCX',
             'file' => $fakeDocx,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response->assertSessionHasErrors(['file']);
@@ -262,7 +298,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $response = $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Macro DOCX',
             'file' => $macroDocx,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response->assertSessionHasErrors(['file']);
@@ -278,7 +316,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $response = $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Big File',
             'file' => $largePdf,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response->assertSessionHasErrors(['file']);
@@ -293,7 +333,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Owner Doc',
             'file' => $pdf,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $planning = Planning::first();
@@ -315,7 +357,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Private Doc',
             'file' => $pdf,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $planning = Planning::first();
@@ -336,6 +380,9 @@ class PrivateStorageAndConservationTest extends TestCase
             'title' => 'Sample',
             'file_path' => 'sample.pdf',
             'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $this->get(route('plannings.download', $planning))->assertRedirect(route('login'));
@@ -349,7 +396,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'PDF Preview',
             'file' => $pdf,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $planning = Planning::first();
@@ -367,7 +416,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Docx Preview',
             'file' => $docx,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $planning = Planning::first();
@@ -386,6 +437,9 @@ class PrivateStorageAndConservationTest extends TestCase
             'title' => 'Missing File Planning',
             'file_path' => 'non_existent_file.pdf',
             'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response = $this->actingAs($this->docente)->get(route('plannings.download', $planning));
@@ -410,6 +464,9 @@ class PrivateStorageAndConservationTest extends TestCase
             'title' => 'Associated Planning',
             'file_path' => 'plannings/associated.pdf',
             'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         // Dry-run command
@@ -463,6 +520,9 @@ class PrivateStorageAndConservationTest extends TestCase
             'title' => 'Restricted FK Planning',
             'file_path' => 'test.pdf',
             'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         // Attempting to delete user or subject must throw QueryException due to restrict constraint
@@ -486,7 +546,9 @@ class PrivateStorageAndConservationTest extends TestCase
         $response = $this->actingAs($this->docente)->post(route('plannings.store'), [
             'title' => 'Will Fail DB',
             'file' => $pdf,
-            'subject_id' => $this->subject->id,
+            'assignment_id' => $this->assignment->id,
+            'week_start' => '2026-08-30',
+            'week_end' => '2026-09-03',
         ]);
 
         $response->assertSessionHas('error');

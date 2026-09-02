@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PlanningStatus;
 use App\Models\Planning;
 use App\Models\Subject;
 use App\Models\User;
@@ -185,11 +186,9 @@ class AuthorizationAndAccountsTest extends TestCase
         $response = $this->actingAs($this->docenteA)->get(route('plannings.view', $planning));
         $response->assertStatus(200);
 
-        $submitRes = $this->actingAs($this->docenteA)->patch(route('plannings.updateStatus', $planning), [
-            'status' => 'revisión',
-        ]);
+        $submitRes = $this->actingAs($this->docenteA)->post(route('plannings.submit', $planning));
         $submitRes->assertRedirect(route('plannings.index'));
-        $this->assertEquals('revisión', $planning->fresh()->status);
+        $this->assertEquals(PlanningStatus::PENDING, $planning->fresh()->status);
     }
 
     public function test_docente_cannot_access_download_comment_or_submit_other_docente_planning(): void
@@ -199,7 +198,7 @@ class AuthorizationAndAccountsTest extends TestCase
             'title' => 'Plan de B',
             'file_path' => 'plannings/b.pdf',
             'subject_id' => $this->subject->id,
-            'status' => 'borrador',
+            'status' => 'draft',
         ]);
 
         $this->actingAs($this->docenteA)->get(route('plannings.view', $planningB))->assertStatus(403);
@@ -208,12 +207,10 @@ class AuthorizationAndAccountsTest extends TestCase
             'body' => 'Intento de comentario',
         ])->assertStatus(403);
 
-        $this->actingAs($this->docenteA)->patch(route('plannings.updateStatus', $planningB), [
-            'status' => 'revisión',
-        ])->assertStatus(403);
+        $this->actingAs($this->docenteA)->post(route('plannings.submit', $planningB))->assertStatus(403);
 
         $this->actingAs($this->docenteA)->delete(route('plannings.destroy', $planningB))->assertStatus(403);
-        $this->assertEquals('borrador', $planningB->fresh()->status);
+        $this->assertEquals(PlanningStatus::DRAFT, $planningB->fresh()->status);
     }
 
     public function test_secretaria_can_view_index_metadata_but_cannot_access_detail_view_download_comment_approve_or_reject(): void
@@ -223,7 +220,7 @@ class AuthorizationAndAccountsTest extends TestCase
             'title' => 'Plan en Revisión',
             'file_path' => 'plannings/rev.pdf',
             'subject_id' => $this->subject->id,
-            'status' => 'revisión',
+            'status' => 'pending',
         ]);
 
         // Listado de metadatos -> OK (200)
@@ -233,13 +230,11 @@ class AuthorizationAndAccountsTest extends TestCase
         $this->actingAs($this->secretaria)->get(route('plannings.view', $planning))->assertStatus(403);
 
         // Aprobar -> 403
-        $this->actingAs($this->secretaria)->patch(route('plannings.updateStatus', $planning), [
-            'status' => 'aprobado',
-        ])->assertStatus(403);
+        $this->actingAs($this->secretaria)->post(route('plannings.approve', $planning))->assertStatus(403);
 
         // Rechazar -> 403
-        $this->actingAs($this->secretaria)->patch(route('plannings.updateStatus', $planning), [
-            'status' => 'rechazado',
+        $this->actingAs($this->secretaria)->post(route('plannings.reject', $planning), [
+            'comment' => 'Intento por Secretaría',
         ])->assertStatus(403);
 
         // Comentar -> 403
@@ -250,7 +245,7 @@ class AuthorizationAndAccountsTest extends TestCase
         // Descargar -> 403
         $this->actingAs($this->secretaria)->get(route('plannings.download', $planning))->assertStatus(403);
 
-        $this->assertEquals('revisión', $planning->fresh()->status);
+        $this->assertEquals(PlanningStatus::PENDING, $planning->fresh()->status);
     }
 
     public function test_vicerrectorado_can_review_approve_reject_and_comment(): void
@@ -260,8 +255,21 @@ class AuthorizationAndAccountsTest extends TestCase
             'title' => 'Plan a Aprobar',
             'file_path' => 'plannings/app.pdf',
             'subject_id' => $this->subject->id,
-            'status' => 'revisión',
+            'status' => 'pending',
         ]);
+        $ver = \App\Models\PlanningVersion::create([
+            'planning_id' => $planning->id,
+            'version' => 1,
+            'file_path' => 'plannings/app.pdf',
+            'file_disk' => 'private_plannings',
+            'original_name' => 'app.pdf',
+            'mime' => 'application/pdf',
+            'size' => 100,
+            'checksum' => hash('sha256', 'app.pdf'),
+            'uploaded_by' => $this->docenteA->id,
+            'created_at' => now(),
+        ]);
+        $planning->update(['current_version_id' => $ver->id]);
 
         $this->actingAs($this->vicerrector)->get(route('plannings.review'))->assertStatus(200);
 
@@ -270,11 +278,9 @@ class AuthorizationAndAccountsTest extends TestCase
         ])->assertRedirect();
         $this->assertDatabaseHas('comments', ['planning_id' => $planning->id, 'user_id' => $this->vicerrector->id]);
 
-        $this->actingAs($this->vicerrector)->patch(route('plannings.updateStatus', $planning), [
-            'status' => 'aprobado',
-        ])->assertRedirect(route('plannings.review'));
+        $this->actingAs($this->vicerrector)->post(route('plannings.approve', $planning))->assertRedirect(route('plannings.review'));
 
-        $this->assertEquals('aprobado', $planning->fresh()->status);
+        $this->assertEquals(PlanningStatus::APPROVED, $planning->fresh()->status);
     }
 
     // --- REPORTES ---

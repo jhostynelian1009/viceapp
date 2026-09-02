@@ -27,6 +27,8 @@
                                     <tr>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Docente</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clasificación Académica</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Semana</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Envío</th>
                                         <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
                                     </tr>
@@ -36,6 +38,22 @@
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{{ $planning->title }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $planning->user->name }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                                @if($planning->assignment)
+                                                    {{ $planning->assignment->subject ? $planning->assignment->subject->name : 'N/A' }} —
+                                                    {{ $planning->assignment->course ? $planning->assignment->course->name : 'N/A' }} —
+                                                    {{ $planning->assignment->parallel ? $planning->assignment->parallel->name : 'N/A' }}
+                                                @else
+                                                    {{ $planning->subject->name ?? 'N/A' }}
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                                @if($planning->week_start && $planning->week_end)
+                                                    {{ $planning->week_start->format('d/m/Y') }} al {{ $planning->week_end->format('d/m/Y') }}
+                                                @else
+                                                    <span class="text-gray-400 italic">No asignada</span>
+                                                @endif
+                                            </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $planning->updated_at->format('d/m/Y H:i') }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <a href="{{ route('plannings.view', $planning) }}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150">

@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\PlanningStatus;
 use App\Models\Planning;
 use App\Models\User;
 
@@ -64,7 +65,7 @@ class PlanningPolicy
     {
         return $user->hasRole('docente')
             && $planning->user_id === $user->id
-            && in_array($planning->status, ['borrador', 'rechazado']);
+            && ($planning->status === PlanningStatus::DRAFT || $planning->status === PlanningStatus::REJECTED);
     }
 
     /**
@@ -74,7 +75,7 @@ class PlanningPolicy
     {
         return $user->hasRole('docente')
             && $planning->user_id === $user->id
-            && $planning->status === 'borrador';
+            && $planning->status === PlanningStatus::DRAFT;
     }
 
     /**
@@ -84,7 +85,7 @@ class PlanningPolicy
     {
         return $user->hasRole('docente')
             && $planning->user_id === $user->id
-            && in_array($planning->status, ['borrador', 'rechazado']);
+            && ($planning->status === PlanningStatus::DRAFT || $planning->status === PlanningStatus::REJECTED);
     }
 
     /**
@@ -100,7 +101,7 @@ class PlanningPolicy
      */
     public function approve(User $user, Planning $planning): bool
     {
-        return $user->hasRole('vicerrectorado') && $planning->status === 'revisión';
+        return $user->hasRole('vicerrectorado') && $planning->status === PlanningStatus::PENDING;
     }
 
     /**
@@ -108,7 +109,7 @@ class PlanningPolicy
      */
     public function reject(User $user, Planning $planning): bool
     {
-        return $user->hasRole('vicerrectorado') && $planning->status === 'revisión';
+        return $user->hasRole('vicerrectorado') && $planning->status === PlanningStatus::PENDING;
     }
 
     /**

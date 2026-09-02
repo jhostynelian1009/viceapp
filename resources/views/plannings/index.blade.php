@@ -97,6 +97,15 @@
                                     <span class="block sm:inline">{{ session('error') }}</span>
                                 </div>
                             @endif
+                            @if($errors->any())
+                                <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                                    <ul>
+                                        @foreach($errors->all() as $error)
+                                            <li>{{ $error }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
 
                             <form action="{{ route('plannings.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
                                 @csrf
@@ -107,16 +116,29 @@
                                 </div>
 
                                 <div>
-                                    <x-input-label for="subject_id" :value="__('Área Académica')" class="text-base"/>
-                                    <select id="subject_id" name="subject_id" class="block mt-2 w-full border-gray-300 focus:border-red-500 focus:ring-red-500 rounded-md shadow-sm" required>
-                                        <option value="">Seleccione un área</option>
-                                        @foreach($subjects as $subject)
-                                            <option value="{{ $subject->id }}" {{ old('subject_id') == $subject->id ? 'selected' : '' }}>
-                                                {{ $subject->name }}
+                                    <x-input-label for="assignment_id" :value="__('Asignación Académica (Asignatura — Curso — Paralelo)')" class="text-base"/>
+                                    <select id="assignment_id" name="assignment_id" class="block mt-2 w-full border-gray-300 focus:border-red-500 focus:ring-red-500 rounded-md shadow-sm" required>
+                                        <option value="">Seleccione una asignación</option>
+                                        @foreach($assignments as $assignment)
+                                            <option value="{{ $assignment->id }}" {{ old('assignment_id') == $assignment->id ? 'selected' : '' }}>
+                                                {{ $assignment->subject ? ($assignment->subject->academicArea ? $assignment->subject->academicArea->name : __('Sin Área')) . ' — ' . $assignment->subject->name : __('Sin Asignatura') }} (Curso: {{ $assignment->course ? $assignment->course->name : __('Sin Curso') }} — Paralelo: {{ $assignment->parallel ? $assignment->parallel->name : __('Sin Paralelo') }})
                                             </option>
                                         @endforeach
                                     </select>
-                                    <x-input-error :messages="$errors->get('subject_id')" class="mt-2" />
+                                    <x-input-error :messages="$errors->get('assignment_id')" class="mt-2" />
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <x-input-label for="week_start" :value="__('Fecha Inicio de Semana')" class="text-base"/>
+                                        <x-text-input id="week_start" class="block mt-2 w-full" type="date" name="week_start" :value="old('week_start')" required />
+                                        <x-input-error :messages="$errors->get('week_start')" class="mt-2" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="week_end" :value="__('Fecha Fin de Semana')" class="text-base"/>
+                                        <x-text-input id="week_end" class="block mt-2 w-full" type="date" name="week_end" :value="old('week_end')" required />
+                                        <x-input-error :messages="$errors->get('week_end')" class="mt-2" />
+                                    </div>
                                 </div>
 
                                 <div>
@@ -173,7 +195,8 @@
                                     <tr>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Docente</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Área Académica</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clasificación Académica</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Semana</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Subida</th>
                                         <th scope="col" class="relative px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -184,16 +207,32 @@
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{{ $planning->title }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $planning->user->name ?? 'N/A' }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $planning->subject->name ?? 'N/A' }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                                                @if($planning->assignment)
+                                                    {{ $planning->assignment->subject ? $planning->assignment->subject->name : 'N/A' }} —
+                                                    {{ $planning->assignment->course ? $planning->assignment->course->name : 'N/A' }} —
+                                                    {{ $planning->assignment->parallel ? $planning->assignment->parallel->name : 'N/A' }}
+                                                @else
+                                                    {{ $planning->subject->name ?? 'N/A' }}
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-semibold">
+                                                @if($planning->week_start && $planning->week_end)
+                                                    {{ $planning->week_start->format('d/m/Y') }} al {{ $planning->week_end->format('d/m/Y') }}
+                                                @else
+                                                    <span class="text-gray-400 italic">No asignada</span>
+                                                @endif
+                                            </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                                 <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                    @switch($planning->status)
-                                                        @case('borrador') bg-yellow-100 text-yellow-800 @break
-                                                        @case('revisión') bg-blue-100 text-blue-800 @break
-                                                        @case('aprobado') bg-green-100 text-green-800 @break
-                                                        @case('rechazado') bg-red-100 text-red-800 @break
+                                                    @switch($planning->status?->value ?? $planning->status)
+                                                        @case('draft') bg-yellow-100 text-yellow-800 @break
+                                                        @case('pending') bg-blue-100 text-blue-800 @break
+                                                        @case('approved') bg-green-100 text-green-800 @break
+                                                        @case('rejected') bg-red-100 text-red-800 @break
+                                                        @default bg-gray-100 text-gray-800
                                                     @endswitch">
-                                                    {{ ucfirst(str_replace('_', ' ', $planning->status)) }}
+                                                    {{ $planning->status instanceof \App\Enums\PlanningStatus ? $planning->status->label() : ucfirst($planning->status) }}
                                                 </span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $planning->created_at->format('d/m/Y H:i') }}</td>
@@ -203,10 +242,8 @@
                                                 @endcan
 
                                                 @can('submit', $planning)
-                                                    <form action="{{ route('plannings.updateStatus', $planning) }}" method="POST" class="inline-block ml-4">
+                                                    <form action="{{ route('plannings.submit', $planning) }}" method="POST" class="inline-block ml-4">
                                                         @csrf
-                                                        @method('PATCH')
-                                                        <input type="hidden" name="status" value="revisión">
                                                         <button type="submit" class="text-blue-600 hover:text-blue-800 font-semibold">Enviar a Revisión</button>
                                                     </form>
                                                 @endcan
@@ -226,7 +263,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="6" class="px-6 py-12 whitespace-nowrap text-sm text-gray-500 text-center">
+                                            <td colspan="7" class="px-6 py-12 whitespace-nowrap text-sm text-gray-500 text-center">
                                                 <p>No se encontraron planificaciones con los criterios de búsqueda.</p>
                                             </td>
                                         </tr>

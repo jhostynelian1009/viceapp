@@ -22,14 +22,26 @@
                             {{ __('Mis Planificaciones') }}
                         </x-nav-link>
                     @endrole
-                    @role('vicerrectorado')
-                        <x-nav-link :href="route('subjects.index')" :active="request()->routeIs('subjects.index')">
+                    @hasanyrole('secretaria|vicerrectorado')
+                        <x-nav-link :href="route('academic-areas.index')" :active="request()->routeIs('academic-areas.index')">
                             {{ __('Áreas Académicas') }}
+                        </x-nav-link>
+                        <x-nav-link :href="route('subjects.index')" :active="request()->routeIs('subjects.index')">
+                            {{ __('Asignaturas') }}
+                        </x-nav-link>
+                        <x-nav-link :href="route('courses.index')" :active="request()->routeIs('courses.index')">
+                            {{ __('Cursos') }}
+                        </x-nav-link>
+                        <x-nav-link :href="route('parallels.index')" :active="request()->routeIs('parallels.index')">
+                            {{ __('Paralelos') }}
+                        </x-nav-link>
+                        <x-nav-link :href="route('teaching-assignments.index')" :active="request()->routeIs('teaching-assignments.index')">
+                            {{ __('Asignaciones') }}
                         </x-nav-link>
                         <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.index')">
                             {{ __('Reportes') }}
                         </x-nav-link>
-                    @endrole
+                    @endhasanyrole
                 </div>
             </div>
 
@@ -95,14 +107,26 @@
                     {{ __('Mis Planificaciones') }}
                 </x-responsive-nav-link>
             @endrole
-            @role('vicerrectorado')
-                <x-responsive-nav-link :href="route('subjects.index')" :active="request()->routeIs('subjects.index')">
+            @hasanyrole('secretaria|vicerrectorado')
+                <x-responsive-nav-link :href="route('academic-areas.index')" :active="request()->routeIs('academic-areas.index')">
                     {{ __('Áreas Académicas') }}
                 </x-responsive-nav-link>
-                 <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.index')">
+                <x-responsive-nav-link :href="route('subjects.index')" :active="request()->routeIs('subjects.index')">
+                    {{ __('Asignaturas') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('courses.index')" :active="request()->routeIs('courses.index')">
+                    {{ __('Cursos') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('parallels.index')" :active="request()->routeIs('parallels.index')">
+                    {{ __('Paralelos') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('teaching-assignments.index')" :active="request()->routeIs('teaching-assignments.index')">
+                    {{ __('Asignaciones') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.index')">
                     {{ __('Reportes') }}
                 </x-responsive-nav-link>
-            @endrole
+            @endhasanyrole
         </div>
 
         <!-- Responsive Settings Options -->

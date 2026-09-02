@@ -64,7 +64,7 @@ No sobrescribir entradas anteriores. Añadir una entrada por cada ejecución de 
 - Acción realizada: 
   - Normalización de los identificadores de roles canónicos (`secretaria`, `vicerrectorado`, `docente`).
   - Creación y ajuste de la migración `database/migrations/2026_08_29_000001_normalize_role_names.php` para soportar comparación binaria portable (MySQL/MariaDB y SQLite). El método `down()` fue modificado para lanzar explícitamente una `RuntimeException` indicando que la normalización es una consolidación irreversible de datos históricos.
-  - Verificación e implementación de idempotencia completa en seeders (`RolesAndPermissionsSeeder`, `UserSeeder`, `SubjectSeeder`, `DatabaseSeeder`). Cuentas demo restringidas estrictamente a entornos `local` y `testing`.
+  - Verificación e implementación de idempotencia completa en seeders (`RolesAndPermissionsSeeder`, `UserSeeder`, `SubjectSeeder`, `DatabaseSeeder`). Cuentas demo restringidas strictly a entornos `local` y `testing`.
   - Actualización de referencias del rol `vicerrector` a `vicerrectorado` en rutas, controladores, vistas y tests.
   - Creación de suites de pruebas automatizadas específicas: `Tests\Feature\RoleNormalizationTest` (verificación de variantes legadas, coexistencia, preservación de pivots `model_has_roles`/`role_has_permissions`, ausencia de duplicados, idempotencia y comportamiento de `down()`) y `Tests\Feature\SeederIdempotencyTest`.
   - Diagnóstico del incidente del comando destructivo `php artisan migrate:fresh --seed` sobre MySQL `viceapp`: La base de datos local fue reconstruida por dicho comando; se confirmó que los metadatos anteriores de planificaciones no poseían respaldo local en formato `.sql`, dejando 5 archivos de planificaciones físicos huérfanos en `storage/app/public/plannings/` sin intentar fabricar o inventar metadatos sintéticos.
@@ -290,9 +290,130 @@ No sobrescribir entradas anteriores. Añadir una entrada por cada ejecución de 
   - **Historial Git**: Los 5 documentos institucionales huérfanos se removieron de la copia de trabajo y cuarentena actual, pero persisten en los commits anteriores del historial de Git. Su purga definitiva requiere autorización institucional.
   - **Acceso a Respaldos**: Los directorios `storage/backups/` y `storage/app/private/quarantine/` guardan copias sensibles y deben asegurarse a nivel de permisos de sistema operativo en el servidor de producción.
 - **Confirmación de NO avance**: Confirmado. Se concluye la Skill K-004 sin avanzar automáticamente a K-005.
+## [2026-08-30] - Skill K-005: Estructura académica y asignaciones docentes
 
+- **Skill ejecutada**: `Skill/K-005-estructura-academica.md`
+- **Especificaciones consultadas**:
+  - `Spec/README.md`
+  - `Spec/S01-vision-alcance.md`
+  - `Spec/S03-requisitos-funcionales.md` (RF-010 a RF-015, RF-020, RF-026)
+  - `Spec/S05-roles-autorizacion.md`
+  - `Spec/S07-modelo-datos.md`
+  - `Spec/S08-arquitectura-convenciones.md`
+  - `Spec/S10-pruebas-calidad.md`
+  - `Skill/K-005-estructura-academica.md`
+  - `AGENTS.md` y `PromptMaster.md`
+- **Archivos creados / modificados**:
+  - `database/seeders/AcademicStructureSeeder.php` *(Seeder idempotente de estructura y asignaciones demo)*
+  - `database/seeders/DatabaseSeeder.php` *(Integración de AcademicStructureSeeder)*
+  - `app/Http/Controllers/AcademicAreaController.php`
+  - `app/Http/Controllers/CourseController.php`
+  - `app/Http/Controllers/ParallelController.php`
+  - `app/Http/Controllers/SubjectController.php`
+  - `app/Http/Controllers/TeachingAssignmentController.php`
+  - `app/Http/Controllers/PlanningController.php` *(Derivación en servidor de user_id y subject_id desde asignación, filtrado de asignaciones activas)*
+  - `app/Models/AcademicArea.php`
+  - `app/Models/Course.php`
+  - `app/Models/Parallel.php`
+  - `app/Models/Subject.php`
+  - `app/Models/TeachingAssignment.php`
+  - `app/Models/Planning.php`
+  - `app/Policies/AcademicAreaPolicy.php`
+  - `app/Policies/CoursePolicy.php`
+  - `app/Policies/ParallelPolicy.php`
+  - `app/Policies/SubjectPolicy.php`
+  - `app/Policies/TeachingAssignmentPolicy.php`
+  - `database/migrations/2026_08_30_000001_create_academic_structure_tables.php`
+  - `database/migrations/2026_08_30_000002_backfill_historical_academic_data.php`
+  - `database/migrations/2026_08_30_000003_activate_academic_restrictions.php`
+  - `tests/Feature/AcademicStructureTest.php` *(11 pruebas completas: migración histórica, matriz de autorización, derivación en servidor, validación de fechas, desactivación de catálogos y aislamiento)*
+  - `tests/Feature/SeederIdempotencyTest.php` *(Verificación de idempotencia de seeders académicos)*
+  - `tests/Feature/SubjectFeatureTest.php`
+- **Comandos ejecutados**:
+  - `php artisan optimize:clear`
+  - `php artisan test` (83 PASSED, 302 assertions, 100% de éxito)
+  - `vendor/bin/pint` / `vendor/bin/pint --test` (PASS, 116 archivos formateados)
+  - `composer validate` (Válido: ./composer.json is valid)
+  - `npm audit --omit=dev` (0 vulnerabilidades)
+  - `npm run build` (Exitoso, Vite bundle generado en 1.17s)
+  - `git diff --check` (Limpio, 0 observaciones)
+- **Pruebas y resultados**:
+  - PHPUnit Suite completa: 83/83 PASSED (100% éxito en SQLite aislado).
+  - `AcademicStructureTest`: 11/11 PASSED.
+  - `PrivateStorageAndConservationTest`: 19/19 PASSED.
+  - `SeederIdempotencyTest`: 2/2 PASSED (incluyendo idempotencia y bloqueo por entorno).
+  - `SubjectFeatureTest`: 3/3 PASSED.
+  - `vendor/bin/pint --test`: PASS.
+  - `npm run build`: Exitoso.
+- **Decisiones tomadas y Verificaciones de Seguridad**:
+  - **Protección del Seeder por Entorno**: Se implementó una salvaguarda explícita en código dentro de `AcademicStructureSeeder::run()` (`if (! app()->environment(['local', 'testing'])) { return; }`) que impide la creación no intencionada de datos demo fuera de entornos de desarrollo/pruebas.
+  - **Prueba Automatizada de Protección por Entorno**: Se añadió en `SeederIdempotencyTest.php` la prueba `test_academic_structure_seeder_blocked_outside_local_and_testing`, confirmando que al simular un entorno de producción, el seeder no genera ningún área, curso, paralelo ni asignación demo, y restaura adecuadamente el entorno original.
+  - **Auditoría de Conservación K-004**: Se auditó mediante `git diff` el archivo `tests/Feature/PrivateStorageAndConservationTest.php`, confirmando que únicamente se adaptaron fixtures de prueba para incluir `assignment_id`, `week_start` y `week_end`, manteniendo intactas el 100% de las 19 aserciones de seguridad y privatización de documentos de K-004.
+  - **Aislamiento Estricto e Integridad en Servidor**: Se derivan `user_id` y `subject_id` en el servidor desde la `TeachingAssignment` activa autorizada para el docente autenticado.
+- **Auditoría de Dependencias y Advisories**:
+  - `composer audit`: Identifica avisos en paquetes Symfony (CVE-2026-24739, CVE-2026-48784, etc.) para su resolución programada en la Skill K-011 (Hardening & Security).
+  - `npm audit --omit=dev`: 0 vulnerabilidades en producción.
+- **Estado Git Final**: Rama `Jhostyn`, 0 errores en `git diff --check`, sin commits ni push ejecutados.
+- **Riesgos o bloqueos**: Ninguno. Todos los criterios de K-005 han sido verificados y asegurados.
+- **Confirmación de NO avance**: Confirmado. Se concluye formalmente la Skill K-005 sin avanzar a K-006.
 
+## [2026-08-30] - Skill K-006: Flujo de trabajo institucional, versiones de documentos y auditoría
 
-
-
-
+- **Skill ejecutada**: `Skill/K-006-flujo-versiones-y-auditoria.md`
+- **Especificaciones consultadas**:
+  - `Spec/README.md`
+  - `Spec/S01-vision-alcance.md`
+  - `Spec/S03-requisitos-funcionales.md` (RF-020 a RF-033, RF-060, RF-061)
+  - `Spec/S05-roles-autorizacion.md`
+  - `Spec/S06-flujo-versiones-auditoria.md`
+  - `Spec/S07-modelo-datos.md`
+  - `Spec/S08-arquitectura-convenciones.md`
+  - `Spec/S09-seguridad-privacidad.md`
+  - `Spec/S10-pruebas-calidad.md`
+  - `Skill/K-006-flujo-versiones-y-auditoria.md`
+  - `AGENTS.md` y `PromptMaster.md`
+- **Archivos creados / modificados**:
+  - `app/Enums/PlanningStatus.php` *(Enum canónico con etiquetas en español y helper tryFromLegacy)*
+  - `app/Models/PlanningVersion.php` *(Modelo de versiones inmutables)*
+  - `app/Models/PlanningReview.php` *(Modelo de revisiones del Vicerrectorado)*
+  - `app/Models/AuditLog.php` *(Modelo append-only inmutable de auditoría)*
+  - `app/Services/PlanningWorkflowService.php` *(Servicio de dominio transaccional de flujo de planificaciones con bloqueos pesimistas lockForUpdate)*
+  - `app/Services/AuditLogger.php` *(Registrador estandarizado de auditoría)*
+  - `app/Models/Planning.php` *(Relaciones currentVersion, versions, reviews y atributo de compatibilidad status)*
+  - `app/Policies/PlanningPolicy.php` *(Autorizaciones de dominio basadas en PlanningStatus: submit, approve, reject, version download)*
+  - `app/Http/Controllers/PlanningController.php` *(Refactorización a acciones explícitas submit, approve, reject, versiones y descargas de versión)*
+  - `database/migrations/2026_08_30_000004_create_planning_versions_table.php`
+  - `database/migrations/2026_08_30_000005_create_planning_reviews_table.php`
+  - `database/migrations/2026_08_30_000006_create_audit_logs_table.php`
+  - `database/migrations/2026_08_30_000007_add_workflow_fields_to_plannings_table.php`
+  - `database/migrations/2026_08_30_000008_backfill_historical_planning_versions.php` *(Migración idempotente para vincular planificaciones históricas con su versión 1)*
+  - `routes/web.php` *(Rutas explícitas plannings.submit, plannings.approve, plannings.reject, plannings.versions.download)*
+  - `resources/views/plannings/index.blade.php` *(UI de listado con badges de PlanningStatus y botones de envío)*
+  - `resources/views/plannings/view.blade.php` *(UI de detalle con tabla de historial de versiones, revisiones previas y panel exclusivo de Vicerrectorado con motivo obligatorio)*
+  - `tests/Feature/PlanningWorkflowTest.php` *(14 pruebas automatizadas de cobertura de workflow, inmutabilidad, auditoría, restricciones y concurrencia)*
+  - `tests/Feature/AuthorizationAndAccountsTest.php` *(Actualización de endpoints a rutas explícitas K-006)*
+  - `Spec/EXECUTION_LOG.md`
+- **Comandos ejecutados**:
+  - `php artisan optimize:clear`
+  - `php artisan test` (97 PASSED, 339 assertions, 100% de éxito en SQLite aislado)
+  - `vendor/bin/pint` / `vendor/bin/pint --test` (PASS, 128 archivos formateados sin advertencias)
+  - `composer validate` (Válido: ./composer.json is valid)
+  - `npm run build` (Exitoso, Vite bundles de producción generados en 1.22s)
+  - `git diff --check` (Limpio, 0 observaciones)
+- **Pruebas y resultados**:
+  - PHPUnit Suite completa: 97/97 PASSED (100% éxito en SQLite efímero).
+  - `PlanningWorkflowTest`: 14/14 PASSED.
+  - `AuthorizationAndAccountsTest`: 17/17 PASSED.
+  - `PrivateStorageAndConservationTest`: 19/19 PASSED.
+  - `AcademicStructureTest`: 11/11 PASSED.
+  - `vendor/bin/pint --test`: PASS.
+  - `npm run build`: Exitoso.
+- **Decisiones tomadas y Soluciones Técnicas**:
+  - **Autoridad Exclusiva de Vicerrectorado**: Las acciones `approve` y `reject` están restringidas por Policy, Controller y Middleware al rol `vicerrectorado`. Secretaría carece por completo de botones o endpoints de aprobación/rechazo.
+  - **Rechazo con Motivo Obligatorio**: Se exige validación de string no vacío para la razón del rechazo en el servicio y controlador.
+  - **Inmutabilidad y Versionado Transaccional**: Al aprobarse, la planificación queda inmutable. Al ser rechazada, el docente debe cargar una nueva versión del documento mediante `updateDraft` antes de poder reexpedirla con `submit`.
+  - **Auditoría Append-Only**: El modelo `AuditLog` lanza `RuntimeException` al intentar mutar o eliminar cualquier registro de auditoría en la base de datos.
+  - **Migración Histórica Segura**: La migración `2026_08_30_000008` analiza los registros existentes en `plannings`, genera automáticamente su `PlanningVersion` inicial v1 calculando tamaño y suma SHA-256 del archivo almacenado, y vincula `current_version_id` de forma transparente.
+- **Riesgos o bloqueos pendientes**:
+  - Ninguno. Todos los requisitos de la máquina de estados, versionado, auditoría y restricción de roles se han implementado y validado mediante pruebas automatizadas.
+- **Confirmación de NO avance**: Confirmado. Se concluye la Skill K-006 sin avanzar automáticamente a la Skill K-007.

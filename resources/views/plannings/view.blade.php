@@ -20,18 +20,39 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-8">
                 <div class="p-6 bg-white border-b border-gray-200">
                     <h3 class="text-2xl font-bold text-gray-900 mb-4">{{ $planning->title }}</h3>
+
+                    @if(session('success'))
+                        <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                            <span class="block sm:inline">{{ session('success') }}</span>
+                        </div>
+                    @endif
+                    @if(session('error'))
+                        <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                            <span class="block sm:inline">{{ session('error') }}</span>
+                        </div>
+                    @endif
+                    @if($errors->any())
+                        <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                            <ul>
+                                @foreach($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
                     
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div>
                             <span class="font-bold text-gray-600">Estado:</span>
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                @switch($planning->status)
-                                    @case('borrador') bg-yellow-100 text-yellow-800 @break
-                                    @case('revisión') bg-blue-100 text-blue-800 @break
-                                    @case('aprobado') bg-green-100 text-green-800 @break
-                                    @case('rechazado') bg-red-100 text-red-800 @break
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                                @switch($planning->status?->value ?? $planning->status)
+                                    @case('draft') bg-yellow-100 text-yellow-800 @break
+                                    @case('pending') bg-blue-100 text-blue-800 @break
+                                    @case('approved') bg-green-100 text-green-800 @break
+                                    @case('rejected') bg-red-100 text-red-800 @break
+                                    @default bg-gray-100 text-gray-800
                                 @endswitch">
-                                {{ ucfirst($planning->status) }}
+                                {{ $planning->status instanceof \App\Enums\PlanningStatus ? $planning->status->label() : ucfirst($planning->status) }}
                             </span>
                         </div>
                         <div>
@@ -39,18 +60,88 @@
                             <span>{{ $planning->created_at->format('d/m/Y H:i') }}</span>
                         </div>
                         <div>
-                            <a href="{{ route('plannings.download', $planning) }}" class="text-blue-500 hover:text-blue-700 font-semibold">
+                            <a href="{{ route('plannings.download', $planning) }}" class="text-blue-600 hover:text-blue-800 font-semibold">
                                 <svg class="inline-block w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                Descargar Archivo
+                                Descargar Versión Actual
                             </a>
                         </div>
                     </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg mb-6 border">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <span class="font-bold text-gray-700 block">{{ __('Clasificación Académica') }}:</span>
+                                <span class="text-gray-900 text-base font-semibold">
+                                    @if($planning->assignment)
+                                        {{ $planning->assignment->subject ? ($planning->assignment->subject->academicArea ? $planning->assignment->subject->academicArea->name : __('Sin Área')) . ' — ' . $planning->assignment->subject->name : __('Sin Asignatura') }}
+                                        <span class="text-sm font-normal text-gray-600">
+                                            (Curso: {{ $planning->assignment->course ? $planning->assignment->course->name : __('Sin Curso') }} — Paralelo: {{ $planning->assignment->parallel ? $planning->assignment->parallel->name : __('Sin Paralelo') }})
+                                        </span>
+                                    @else
+                                        {{ $planning->subject->name ?? 'N/A' }}
+                                    @endif
+                                </span>
+                            </div>
+                            <div>
+                                <span class="font-bold text-gray-700 block">{{ __('Semana Planificada') }}:</span>
+                                <span class="text-gray-900 text-base font-semibold">
+                                    @if($planning->week_start && $planning->week_end)
+                                        {{ $planning->week_start->format('d/m/Y') }} al {{ $planning->week_end->format('d/m/Y') }}
+                                    @else
+                                        <span class="text-gray-400 italic">{{ __('No asignada') }}</span>
+                                    @endif
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Historial de Versiones e Inspección de Documentos -->
+                    @if($planning->versions->count() > 0)
+                        <div class="mt-6 border-t pt-6">
+                            <h4 class="text-xl font-bold text-gray-800 mb-4">Historial de Versiones del Documento</h4>
+                            <div class="overflow-x-auto border rounded-lg mb-6">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Versión</th>
+                                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nombre Original</th>
+                                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tamaño</th>
+                                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cargado por</th>
+                                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                            <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        @foreach($planning->versions as $ver)
+                                            <tr class="hover:bg-gray-50 @if($planning->current_version_id == $ver->id) bg-blue-50/50 @endif">
+                                                <td class="px-4 py-2 text-sm font-bold text-gray-800">
+                                                    v{{ $ver->version }}
+                                                    @if($planning->current_version_id == $ver->id)
+                                                        <span class="ml-2 text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full font-semibold">Actual</span>
+                                                    @endif
+                                                </td>
+                                                <td class="px-4 py-2 text-sm text-gray-700">{{ $ver->original_name }}</td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">{{ number_format($ver->size / 1024, 1) }} KB</td>
+                                                <td class="px-4 py-2 text-sm text-gray-600">{{ $ver->uploader?->name ?? 'N/A' }}</td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">{{ $ver->created_at->format('d/m/Y H:i') }}</td>
+                                                <td class="px-4 py-2 text-sm text-right">
+                                                    @can('download', $planning)
+                                                        <a href="{{ route('plannings.versions.download', [$planning, $ver]) }}" class="text-blue-600 hover:text-blue-800 font-semibold text-xs">Descargar</a>
+                                                    @endcan
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @endif
 
                     <!-- Visor de Documentos Híbrido -->
                     @if($planning->file_path)
                         <div class="mt-6 border-t pt-6">
                             <div class="flex justify-between items-center mb-4">
-                                <h4 class="text-xl font-bold text-gray-800">Visualizador de Documento</h4>
+                                <h4 class="text-xl font-bold text-gray-800">Visualizador de Documento Actual</h4>
                                 <span class="text-sm text-gray-600">Almacenamiento Privado Seguro</span>
                             </div>
 
@@ -78,14 +169,35 @@
                                 </div>
                             @endif
                         </div>
-                    @else
-                        <div class="mt-6 text-center text-gray-500">
-                            <p>No hay un archivo asociado a esta planificación.</p>
-                        </div>
                     @endif
                 </div>
             </div>
-            
+
+            <!-- Sección de Revisiones e Historial de Decisiones -->
+            @if($planning->reviews->count() > 0)
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-8">
+                    <div class="p-6">
+                        <h4 class="text-xl font-bold text-gray-900 mb-4">Historial de Revisiones del Vicerrectorado</h4>
+                        <div class="space-y-4">
+                            @foreach($planning->reviews as $rev)
+                                <div class="p-4 rounded-lg border @if($rev->decision === 'approved') bg-green-50 border-green-200 @else bg-red-50 border-red-200 @endif">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-bold text-sm @if($rev->decision === 'approved') text-green-800 @else text-red-800 @endif">
+                                            Decisión: {{ $rev->decision === 'approved' ? 'Aprobada' : 'Rechazada' }} (v{{ $rev->version?->version ?? 1 }})
+                                        </span>
+                                        <span class="text-xs text-gray-500">{{ $rev->created_at->format('d/m/Y H:i') }}</span>
+                                    </div>
+                                    <p class="text-sm text-gray-700"><strong>Revisor:</strong> {{ $rev->reviewer?->name ?? 'Vicerrectorado' }}</p>
+                                    @if($rev->comment)
+                                        <p class="text-sm text-gray-800 mt-2 bg-white p-3 rounded border"><strong>Motivo / Observación:</strong> {{ $rev->comment }}</p>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Panel de Gestión de Estado y Comentarios -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div class="lg:col-span-2">
@@ -115,26 +227,31 @@
                         </div>
                     </div>
                 </div>
+
                 @auth
-                    @if( (Auth::user()->hasRole('secretaria') || Auth::user()->hasRole('vicerrectorado')) && $planning->status === 'revisión' )
+                    {{-- EXCLUSIVO VICERRECTORADO: Solo Vicerrectorado puede aprobar o rechazar --}}
+                    @if( Auth::user()->hasRole('vicerrectorado') && ($planning->status === \App\Enums\PlanningStatus::PENDING || $planning->status === 'pending') )
                         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg border-t-4 border-blue-500">
                             <div class="p-6">
-                                <h4 class="text-xl font-bold text-gray-800 mb-4">Panel de Gestión</h4>
-                                <div class="space-y-4">
-                                    <form action="{{ route('plannings.updateStatus', $planning) }}" method="POST">
+                                <h4 class="text-xl font-bold text-gray-800 mb-4">Panel de Decisión (Vicerrectorado)</h4>
+                                <div class="space-y-6">
+                                    <!-- Formulario Aprobar -->
+                                    <form action="{{ route('plannings.approve', $planning) }}" method="POST">
                                         @csrf
-                                        @method('PATCH')
-                                        <input type="hidden" name="status" value="aprobado">
                                         <button type="submit" class="w-full inline-flex justify-center items-center px-6 py-3 bg-green-600 border rounded-md font-semibold text-white hover:bg-green-700">
-                                            Aprobar
+                                            Aprobar Planificación
                                         </button>
                                     </form>
-                                    <form action="{{ route('plannings.updateStatus', $planning) }}" method="POST">
+
+                                    <!-- Formulario Rechazar con Motivo Obligatorio -->
+                                    <form action="{{ route('plannings.reject', $planning) }}" method="POST" class="space-y-3">
                                         @csrf
-                                        @method('PATCH')
-                                        <input type="hidden" name="status" value="rechazado">
+                                        <div>
+                                            <label for="comment" class="block text-sm font-medium text-gray-700">Motivo del Rechazo (Obligatorio)</label>
+                                            <textarea id="comment" name="comment" rows="3" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm" placeholder="Describa claramente las correcciones requeridas..."></textarea>
+                                        </div>
                                         <button type="submit" class="w-full inline-flex justify-center items-center px-6 py-3 bg-red-600 border rounded-md font-semibold text-white hover:bg-red-700">
-                                            Rechazar
+                                            Rechazar Planificación
                                         </button>
                                     </form>
                                 </div>
