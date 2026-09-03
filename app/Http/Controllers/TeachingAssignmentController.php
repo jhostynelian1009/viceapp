@@ -88,11 +88,19 @@ class TeachingAssignmentController extends Controller
             return back()->withErrors(['teacher_id' => 'Esta asignación docente ya existe.'])->withInput();
         }
 
-        TeachingAssignment::create([
+        $assignment = TeachingAssignment::create([
             'teacher_id' => $validated['teacher_id'],
             'subject_id' => $validated['subject_id'],
             'course_id' => $validated['course_id'],
             'parallel_id' => $validated['parallel_id'],
+            'is_active' => true,
+        ]);
+
+        \App\Services\AuditLogger::log($request->user(), 'teaching_assignment.created', $assignment, null, [
+            'teacher_id' => $assignment->teacher_id,
+            'subject_id' => $assignment->subject_id,
+            'course_id' => $assignment->course_id,
+            'parallel_id' => $assignment->parallel_id,
             'is_active' => true,
         ]);
 
@@ -195,6 +203,14 @@ class TeachingAssignmentController extends Controller
             }
         }
 
+        $oldValues = [
+            'teacher_id' => $teachingAssignment->teacher_id,
+            'subject_id' => $teachingAssignment->subject_id,
+            'course_id' => $teachingAssignment->course_id,
+            'parallel_id' => $teachingAssignment->parallel_id,
+            'is_active' => $teachingAssignment->is_active,
+        ];
+
         $teachingAssignment->update([
             'teacher_id' => $validated['teacher_id'],
             'subject_id' => $validated['subject_id'],
@@ -203,13 +219,24 @@ class TeachingAssignmentController extends Controller
             'is_active' => $request->has('is_active') ? $validated['is_active'] : $teachingAssignment->is_active,
         ]);
 
+        \App\Services\AuditLogger::log($request->user(), 'teaching_assignment.updated', $teachingAssignment, $oldValues, [
+            'teacher_id' => $teachingAssignment->teacher_id,
+            'subject_id' => $teachingAssignment->subject_id,
+            'course_id' => $teachingAssignment->course_id,
+            'parallel_id' => $teachingAssignment->parallel_id,
+            'is_active' => $teachingAssignment->is_active,
+        ]);
+
         return redirect()->route('teaching-assignments.index')
             ->with('success', 'Asignación docente actualizada correctamente.');
     }
 
     public function destroy(TeachingAssignment $teachingAssignment)
     {
+        $oldActive = $teachingAssignment->is_active;
         $teachingAssignment->update(['is_active' => false]);
+
+        \App\Services\AuditLogger::log(auth()->user(), 'teaching_assignment.deactivated', $teachingAssignment, ['is_active' => $oldActive], ['is_active' => false]);
 
         return redirect()->route('teaching-assignments.index')
             ->with('success', 'Asignación docente desactivada correctamente.');
@@ -217,7 +244,10 @@ class TeachingAssignmentController extends Controller
 
     public function toggleActive(TeachingAssignment $teachingAssignment)
     {
+        $oldActive = $teachingAssignment->is_active;
         $teachingAssignment->update(['is_active' => ! $teachingAssignment->is_active]);
+
+        \App\Services\AuditLogger::log(auth()->user(), 'teaching_assignment.status_changed', $teachingAssignment, ['is_active' => $oldActive], ['is_active' => $teachingAssignment->is_active]);
 
         return redirect()->route('teaching-assignments.index')
             ->with('success', 'Estado de asignación docente actualizado correctamente.');

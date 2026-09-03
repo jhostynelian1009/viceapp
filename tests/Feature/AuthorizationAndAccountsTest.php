@@ -266,6 +266,8 @@ class AuthorizationAndAccountsTest extends TestCase
             'mime' => 'application/pdf',
             'size' => 100,
             'checksum' => hash('sha256', 'app.pdf'),
+            'integrity_status' => 'verified',
+            'integrity_verified_at' => now(),
             'uploaded_by' => $this->docenteA->id,
             'created_at' => now(),
         ]);

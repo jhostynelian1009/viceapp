@@ -33,6 +33,20 @@ class Planning extends Model
         'decided_at' => 'datetime',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function (Planning $planning) {
+            if ($planning->current_version_id !== null) {
+                $version = PlanningVersion::find($planning->current_version_id);
+                if ($version && (int) $version->planning_id !== (int) $planning->id) {
+                    throw new \InvalidArgumentException("La versión actual {$planning->current_version_id} no pertenece a la planificación {$planning->id}.");
+                }
+            }
+        });
+    }
+
     protected function status(): \Illuminate\Database\Eloquent\Casts\Attribute
     {
         return \Illuminate\Database\Eloquent\Casts\Attribute::make(

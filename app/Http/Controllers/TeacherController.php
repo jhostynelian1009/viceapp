@@ -49,6 +49,13 @@ class TeacherController extends Controller
 
         $user->assignRole('docente');
 
+        \App\Services\AuditLogger::log($request->user(), 'user.created', $user, null, [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => 'docente',
+            'is_active' => true,
+        ]);
+
         return redirect()->route('teachers.index')
             ->with('success', 'Docente creado exitosamente.');
     }
@@ -79,6 +86,7 @@ class TeacherController extends Controller
     public function update(UpdateTeacherRequest $request, User $teacher)
     {
         $validated = $request->validated();
+        $oldValues = ['name' => $teacher->name, 'email' => $teacher->email];
 
         $teacher->name = $validated['name'];
         $teacher->email = $validated['email'];
@@ -86,6 +94,11 @@ class TeacherController extends Controller
             $teacher->password = Hash::make($validated['password']);
         }
         $teacher->save();
+
+        \App\Services\AuditLogger::log($request->user(), 'user.updated', $teacher, $oldValues, [
+            'name' => $teacher->name,
+            'email' => $teacher->email,
+        ]);
 
         return redirect()->route('teachers.index')
             ->with('success', 'Docente actualizado exitosamente.');
@@ -98,8 +111,11 @@ class TeacherController extends Controller
     {
         Gate::authorize('toggleActive', $teacher);
 
+        $oldActive = $teacher->is_active;
         $teacher->is_active = ! $teacher->is_active;
         $teacher->save();
+
+        \App\Services\AuditLogger::log($request->user(), 'user.status_changed', $teacher, ['is_active' => $oldActive], ['is_active' => $teacher->is_active]);
 
         $statusMessage = $teacher->is_active ? 'cuenta activada' : 'cuenta desactivada';
 
@@ -114,8 +130,11 @@ class TeacherController extends Controller
     {
         Gate::authorize('toggleActive', $teacher);
 
+        $oldActive = $teacher->is_active;
         $teacher->is_active = false;
         $teacher->save();
+
+        \App\Services\AuditLogger::log(auth()->user(), 'user.deactivated', $teacher, ['is_active' => $oldActive], ['is_active' => false]);
 
         return redirect()->route('teachers.index')
             ->with('success', 'Docente desactivado exitosamente.');

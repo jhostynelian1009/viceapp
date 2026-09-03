@@ -64,6 +64,8 @@ class PlanningWorkflowService
                     'mime' => $mime,
                     'size' => $size,
                     'checksum' => $checksum,
+                    'integrity_status' => 'verified',
+                    'integrity_verified_at' => now(),
                     'uploaded_by' => $teacher->id,
                     'created_at' => now(),
                 ]);
@@ -74,6 +76,11 @@ class PlanningWorkflowService
                     'title' => $planning->title,
                     'status' => $planning->status->value,
                     'version' => 1,
+                ]);
+
+                AuditLogger::log($teacher, 'planning.version_created', $planning, null, [
+                    'version' => 1,
+                    'checksum' => $checksum,
                 ]);
 
                 return $planning->fresh(['currentVersion', 'assignment', 'subject']);
@@ -147,12 +154,19 @@ class PlanningWorkflowService
                         'mime' => $mime,
                         'size' => $size,
                         'checksum' => $checksum,
+                        'integrity_status' => 'verified',
+                        'integrity_verified_at' => now(),
                         'uploaded_by' => $teacher->id,
                         'created_at' => now(),
                     ]);
 
                     $updateData['file_path'] = $storedPath;
                     $updateData['current_version_id'] = $newVersion->id;
+
+                    AuditLogger::log($teacher, 'planning.version_created', $p, null, [
+                        'version' => $nextVersionNumber,
+                        'checksum' => $checksum,
+                    ]);
                 }
 
                 $p->update($updateData);
@@ -192,7 +206,18 @@ class PlanningWorkflowService
                 ]);
             }
 
+            $currentVersion = $p->currentVersion ?: $p->versions()->latest('version')->first();
+
+            if ($currentVersion && $currentVersion->isMissingFile()) {
+                throw ValidationException::withMessages([
+                    'file' => 'No es posible enviar la planificación porque el archivo del documento original no se encuentra disponible.',
+                ]);
+            }
+
+            $isResubmission = false;
+
             if ($p->status === PlanningStatus::REJECTED) {
+                $isResubmission = true;
                 // Must have uploaded a newer version after rejection review
                 $latestReview = $p->reviews()->where('decision', 'rejected')->latest('id')->first();
                 if ($latestReview && $p->current_version_id === $latestReview->version_id) {
@@ -210,6 +235,13 @@ class PlanningWorkflowService
 
             AuditLogger::log($teacher, 'planning.submitted', $p, ['status' => $fromStatus], ['status' => PlanningStatus::PENDING->value]);
 
+            if ($isResubmission) {
+                AuditLogger::log($teacher, 'planning.resubmitted', $p, ['status' => $fromStatus], [
+                    'status' => PlanningStatus::PENDING->value,
+                    'version_id' => $p->current_version_id,
+                ]);
+            }
+
             return $p->fresh();
         });
     }
@@ -225,6 +257,14 @@ class PlanningWorkflowService
             if ($p->status !== PlanningStatus::PENDING) {
                 throw ValidationException::withMessages([
                     'status' => 'Solo se pueden aprobar planificaciones en estado pendiente.',
+                ]);
+            }
+
+            $currentVersion = $p->currentVersion ?: $p->versions()->latest('version')->first();
+
+            if ($currentVersion && ($currentVersion->isMissingFile() || $currentVersion->isUnknownLegacyMetadata())) {
+                throw ValidationException::withMessages([
+                    'planning' => 'No es posible aprobar la planificación debido a anomalías en los metadatos o archivo de la versión actual.',
                 ]);
             }
 
@@ -271,6 +311,14 @@ class PlanningWorkflowService
             if ($p->status !== PlanningStatus::PENDING) {
                 throw ValidationException::withMessages([
                     'status' => 'Solo se pueden rechazar planificaciones en estado pendiente.',
+                ]);
+            }
+
+            $currentVersion = $p->currentVersion ?: $p->versions()->latest('version')->first();
+
+            if ($currentVersion && $currentVersion->isMissingFile()) {
+                throw ValidationException::withMessages([
+                    'planning' => 'No es posible procesar el rechazo porque el archivo adjunto no se encuentra disponible.',
                 ]);
             }
 

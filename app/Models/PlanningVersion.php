@@ -21,15 +21,33 @@ class PlanningVersion extends Model
         'mime',
         'size',
         'checksum',
+        'integrity_status',
+        'integrity_verified_at',
         'uploaded_by',
         'created_at',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
+        'integrity_verified_at' => 'datetime',
         'version' => 'integer',
         'size' => 'integer',
     ];
+
+    public function isVerified(): bool
+    {
+        return $this->integrity_status === 'verified';
+    }
+
+    public function isMissingFile(): bool
+    {
+        return $this->integrity_status === 'missing_file';
+    }
+
+    public function isUnknownLegacyMetadata(): bool
+    {
+        return $this->integrity_status === 'unknown_legacy_metadata';
+    }
 
     public function planning(): BelongsTo
     {

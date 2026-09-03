@@ -13,7 +13,7 @@ class AuditLogger
      */
     public static function log(?User $actor, string $event, Model $auditable, ?array $oldValues = null, ?array $newValues = null): AuditLog
     {
-        // Sanitize sensitive keys if any exist in arrays
+        // Sanitize sensitive keys and values if any exist in arrays
         $sanitizedOld = self::sanitize($oldValues);
         $sanitizedNew = self::sanitize($newValues);
 
@@ -29,22 +29,57 @@ class AuditLogger
     }
 
     /**
-     * Remove sensitive keys (password, token, etc.) from log payloads.
+     * Remove sensitive keys and sensitive value patterns (passwords, tokens, absolute paths, SQL, etc.).
      */
-    protected static function sanitize(?array $data): ?array
+    public static function sanitize(?array $data): ?array
     {
         if ($data === null) {
             return null;
         }
 
-        $hiddenKeys = ['password', 'remember_token', 'token', 'secret', 'content', 'file'];
+        $hiddenKeys = [
+            'password',
+            'password_confirmation',
+            'remember_token',
+            'token',
+            'secret',
+            'authorization',
+            'auth_header',
+            'content',
+            'file',
+            'binary',
+            'file_content',
+            'document_content',
+            'file_path',
+        ];
 
-        foreach ($hiddenKeys as $key) {
-            if (array_key_exists($key, $data)) {
-                unset($data[$key]);
+        $sanitized = [];
+
+        foreach ($data as $key => $value) {
+            if (in_array(strtolower($key), $hiddenKeys, true)) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                $sanitized[$key] = self::sanitize($value);
+            } elseif (is_string($value)) {
+                // Strip absolute file paths (Windows e.g., C:\... or Unix e.g., /var/...)
+                if (preg_match('/^[A-Z]:\\\\|^\\/storage|^\\/var|^\\/tmp/i', $value)) {
+                    $sanitized[$key] = basename($value);
+                } elseif (preg_match('/SELECT|INSERT|UPDATE|DELETE|DROP|TRUNCATE/i', $value)) {
+                    // Strip raw SQL statements
+                    $sanitized[$key] = '[SQL Query Redacted]';
+                } elseif (str_contains($value, 'Stack trace:') || str_contains($value, 'Exception:')) {
+                    // Strip exception stack traces
+                    $sanitized[$key] = '[Exception Redacted]';
+                } else {
+                    $sanitized[$key] = $value;
+                }
+            } else {
+                $sanitized[$key] = $value;
             }
         }
 
-        return $data;
+        return $sanitized;
     }
 }

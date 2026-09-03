@@ -26,9 +26,15 @@ class AcademicAreaController extends Controller
             'code' => 'required|string|max:255|unique:academic_areas,code',
         ]);
 
-        AcademicArea::create([
+        $academicArea = AcademicArea::create([
             'name' => $validated['name'],
             'code' => $validated['code'],
+            'is_active' => true,
+        ]);
+
+        \App\Services\AuditLogger::log($request->user(), 'academic_area.created', $academicArea, null, [
+            'name' => $academicArea->name,
+            'code' => $academicArea->code,
             'is_active' => true,
         ]);
 
@@ -49,7 +55,14 @@ class AcademicAreaController extends Controller
             'is_active' => 'sometimes|boolean',
         ]);
 
+        $oldValues = ['name' => $academicArea->name, 'code' => $academicArea->code, 'is_active' => $academicArea->is_active];
         $academicArea->update($validated);
+
+        \App\Services\AuditLogger::log($request->user(), 'academic_area.updated', $academicArea, $oldValues, [
+            'name' => $academicArea->name,
+            'code' => $academicArea->code,
+            'is_active' => $academicArea->is_active,
+        ]);
 
         return redirect()->route('academic-areas.index')
             ->with('success', 'Área académica actualizada correctamente.');
@@ -57,7 +70,10 @@ class AcademicAreaController extends Controller
 
     public function destroy(AcademicArea $academicArea)
     {
+        $oldActive = $academicArea->is_active;
         $academicArea->update(['is_active' => false]);
+
+        \App\Services\AuditLogger::log(auth()->user(), 'academic_area.deactivated', $academicArea, ['is_active' => $oldActive], ['is_active' => false]);
 
         return redirect()->route('academic-areas.index')
             ->with('success', 'Área académica desactivada correctamente.');
@@ -65,7 +81,10 @@ class AcademicAreaController extends Controller
 
     public function toggleActive(AcademicArea $academicArea)
     {
+        $oldActive = $academicArea->is_active;
         $academicArea->update(['is_active' => ! $academicArea->is_active]);
+
+        \App\Services\AuditLogger::log(auth()->user(), 'academic_area.status_changed', $academicArea, ['is_active' => $oldActive], ['is_active' => $academicArea->is_active]);
 
         return redirect()->route('academic-areas.index')
             ->with('success', 'Estado de área académica actualizado correctamente.');

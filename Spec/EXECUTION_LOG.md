@@ -417,3 +417,94 @@ No sobrescribir entradas anteriores. Añadir una entrada por cada ejecución de 
 - **Riesgos o bloqueos pendientes**:
   - Ninguno. Todos los requisitos de la máquina de estados, versionado, auditoría y restricción de roles se han implementado y validado mediante pruebas automatizadas.
 - **Confirmación de NO avance**: Confirmado. Se concluye la Skill K-006 sin avanzar automáticamente a la Skill K-007.
+
+## [2026-09-02] - K-006: Auditoría, Reconciliación Aditiva y Corrección de Integridad Final
+
+- **Skill ejecutada**: `Skill/K-006-flujo-versiones-y-auditoria.md` (Auditoría de Integridad y Reconciliación Aditiva)
+- **Estado**: COMPLETADA Y CORREGIDA
+- **Rama Git**: `Jhostyn`
+- **Diagnóstico y Commit de Registro K-006**:
+  - Hash del Commit: `7915019` (`7915019 | jhostynelian1009 | 2026-09-01 20:56:44 -0500 | Implementación de Funciones`).
+  - Autor y Fecha: `jhostynelian1009`, `2026-09-01 20:56:44 -0500`.
+  - Estado de Remote: Confirmado en `origin/Jhostyn`. Contiene las migraciones 000004 a 000008, servicios de workflow, modelos y vistas de K-006.
+- **Manejo de Migración K-005 (`2026_08_30_000002_backfill_historical_academic_data.php`)**:
+  - Se identificó que la modificación previa fue únicamente formateo de código generado por `vendor/bin/pint` (`return new class` / espacio en `! $assignment`).
+  - Se restauró el contenido original exacto de la migración K-005 en Git (`git checkout -- ...`) para preservar la inmutabilidad de migraciones históricas.
+- **Estrategia Aditiva e Idempotencia (`2026_09_02_000009_reconcile_historical_planning_workflow.php`)**:
+  - Se conservaron intactas las migraciones 000004 a 000008 ejecutadas en la BD (`Batch 5`).
+  - Se implementó la nueva migración aditiva `2026_09_02_000009_reconcile_historical_planning_workflow.php` (`Batch 6`), la cual realiza de forma idempotente la validación estricta de estados históricos (lanzando `RuntimeException` ante estados desconocidos) y el backfill de versiones iniciales registrando anomalías de archivos sin sobreescribir datos.
+- **Justificación de Vista Eliminada (`resources/views/plannings/admin-index.blade.php`)**:
+  - La vista `admin-index.blade.php` era un prototipo preliminar huérfano sin referencias activas en rutas (`routes/web.php`) ni controladores.
+  - La bandeja de revisión oficial de Vicerrectorado está completamente implementada en `resources/views/plannings/review.blade.php` (`route('plannings.review')`).
+  - Se añadió la prueba automatizada `test_vicerrectorado_can_access_review_inbox_while_others_are_denied` que certifica que Vicerrectorado accede exitosamente a la bandeja de revisión (status 200), mientras Secretaría y Docentes son rechazados con 403 Forbidden.
+- **Estado de Migraciones y Datos (`php artisan migrate:status`)**:
+  - Todas las migraciones desde `0001_01_01_000000` hasta `2026_09_02_000009` se encuentran en estado **Ran** (100% aplicadas).
+  - Conteos de BD: `plannings`: 0, `planning_versions`: 0, `planning_reviews`: 0, `audit_logs`: 0.
+  - Validaciones de Invariantes: 0 asignaciones cruzadas de `current_version_id`, 0 números de versión duplicados por planificación.
+- **Cobertura de Auditoría Ampliada (`AuditLogger`)**:
+  - Se extendió `AuditLogger::log` a la gestión de Cuentas de Usuario (`TeacherController`), Áreas Académicas (`AcademicAreaController`), Cursos (`CourseController`), Paralelos (`ParallelController`), Asignaturas (`SubjectController`) y Asignaciones Docentes (`TeachingAssignmentController`).
+  - Se fortaleció `AuditLogger::sanitize` para omitir claves sensibles (`password`, `token`, `secret`, `authorization`, `content`, `file`, `binary`) y redactar dinámicamente rutas absolutas del sistema, consultas SQL y trazas de excepciones (`[SQL Query Redacted]`, `[Exception Redacted]`).
+  - Validado mediante el test `test_audit_logger_sanitizes_sensitive_keys`.
+- **Limitación de Concurrencia SQLite vs MySQL**:
+  - Se documenta explícitamente que SQLite `:memory:` ignora las cláusulas de bloqueo de fila `lockForUpdate()`.
+  - Las pruebas en SQLite certifican la corrección lógica del servicio, transacciones DB, restricciones `UNIQUE(planning_id, version)`, decisiones únicas y prevención de registros parciales. La prueba de concurrencia física con bloqueos reales se limita a entornos de integración sobre MySQL aislado.
+- **Pruebas y Verificación de Calidad**:
+  - Suite PHPUnit Completa: **106 PASSED** (368 assertions, 100% de éxito).
+  - `PlanningWorkflowTest`: 23/23 PASSED.
+  - `vendor/bin/pint --test`: **PASS** (129 archivos formateados correctamente).
+  - `composer validate`: `./composer.json is valid`.
+  - `composer audit`: Reporta advisories conocidas en Symfony (`symfony/process`, `symfony/routing`, `symfony/yaml`) sin cambios fuera de alcance.
+  - `npm audit --omit=dev`: 0 vulnerabilidades.
+  - `npm run build`: Build de producción Vite exitoso.
+  - `git diff --check`: Sin advertencias de espacio en blanco.
+- **Estado Git Final**:
+  - Rama: `Jhostyn`.
+  - Sin commits ni push ejecutados.
+- **Confirmación de NO avance**: Confirmado. Se concluye la Skill K-006 sin avanzar ni iniciar K-007.
+
+## [2026-09-03] - Hotfix K-006: Reparación Honestidad Metadatos Históricos y Migración 000010
+
+- **Skill ejecutada**: Hotfix K-006 (Eliminación de metadatos sintéticos y salvaguarda de integridad documental).
+- **Especificaciones consultadas**: `Spec/README.md`, `Skill/README.md`, `K-006-workflow-versions/SKILL.md`, `AGENTS.md`.
+- **Archivos creados / modificados**:
+  - `database/migrations/2026_09_03_000010_repair_legacy_planning_version_metadata.php`: Migración aditiva para corregir metadatos sintéticos, volver nulas las columnas sin evidencia (`checksum`, `size`, `mime`, `original_name`) e introducir el campo `integrity_status` (`verified`, `missing_file`, `unknown_legacy_metadata`).
+  - `app/Models/PlanningVersion.php`: Agregados `integrity_status`, `integrity_verified_at` a `$fillable` y `$casts` más métodos helper `isVerified()`, `isMissingFile()`, `isUnknownLegacyMetadata()`.
+  - `app/Services/PlanningWorkflowService.php`: Implementadas salvaguardas para bloquear envíos, aprobaciones o rechazos de versiones con `missing_file` o `unknown_legacy_metadata`, y registrados eventos de auditoría `planning.version_created` y `planning.resubmitted`.
+  - `app/Http/Controllers/PlanningController.php`: Bloqueadas descargas y previsualizaciones de versiones marcadas como `missing_file` respondiendo HTTP 404 sin inventar contenido.
+  - `app/Services/AuditLogger.php`: Sanitización recursiva de arreglos anidados e inspección de rutas y consultas.
+  - `tests/Feature/PlanningWorkflowTest.php`: Incorporadas pruebas completas de honestidad documental para migración 000010, idoneidad de idempotencia, salvaguardas de descarga/envío/aprobación, auditorías de resubmisión y sanitización recursiva.
+- **Migraciones ejecutadas**:
+  - `php artisan migrate --pretend`: Inspeccionado y verificado que NO contiene `DROP`, `TRUNCATE`, ni eliminación de planificaciones/versiones.
+  - `php artisan migrate`: Ejecutada exitosamente migración `2026_09_03_000010_repair_legacy_planning_version_metadata` en Batch 7.
+- **Pruebas y Verificación de Calidad**:
+  - Suite PHPUnit Completa: **108 PASSED** (388 assertions, 100% de éxito).
+  - `PlanningWorkflowTest`: 25/25 PASSED.
+  - `vendor/bin/pint --test`: **PASS** (130 archivos formateados correctamente).
+  - `npm run build`: Build de producción Vite exitoso.
+  - `.phpunit.result.cache`: Restaurado a su estado previo en Git.
+- **Confirmación de NO avance**: Confirmado. Se ha trabajado exclusivamente en el Hotfix de K-006. NO se realizaron commits, push, ni se inició la Skill K-007.
+
+## [2026-09-03] - Hotfix Final K-006: Default Seguro de Integridad (Migración 000011)
+
+- **Skill ejecutada**: Hotfix Final K-006 (Default Seguro `unknown_legacy_metadata` en `planning_versions`).
+- **Especificaciones consultadas**: `Spec/README.md`, `Skill/README.md`, `K-006-workflow-versions/SKILL.md`, `AGENTS.md`.
+- **Razón del cambio**: El valor `default 'verified'` en la migración 000010 permitía que registros insertados sin comprobación previa quedasen calificados como verificados. Se aplicó el principio de menor privilegio e integridad estricta: todo registro legado es desconocido hasta demostrar lo contrario.
+- **Archivos creados / modificados**:
+  - `database/migrations/2026_09_03_000011_secure_planning_version_integrity_default.php`: Cambia el `default` de `integrity_status` a `unknown_legacy_metadata` y reconcilia de forma estricta los registros existentes.
+  - `app/Services/PlanningWorkflowService.php`: Modificado para establecer explícitamente `integrity_status = 'verified'` e `integrity_verified_at = now()` con SHA-256, tamaño, MIME y `original_name` reales sin depender de defaults de la base de datos.
+  - `tests/Feature/PlanningWorkflowTest.php`: Incorporada `test_secure_planning_version_integrity_default_and_000011_reconciliation` validando que inserciones directas sin estado adoptan `unknown_legacy_metadata`, registros con 64 ceros o archivos ausentes no quedan `verified`, y la reconciliación 000011 es idempotente sin borrar planificaciones ni archivos.
+  - `tests/Feature/AuthorizationAndAccountsTest.php`: Actualizado fixture de prueba para incluir estado `verified` explícito.
+- **Resultados de Reconciliación en BD Local**:
+  - Versiones inspeccionadas: 0 (la BD local no posee planificaciones históricas).
+  - Versiones marcadas `verified`: 0.
+  - Versiones marcadas `missing_file`: 0.
+  - Versiones marcadas `unknown_legacy_metadata`: 0.
+  - Metadatos sintéticos restantes (hashes de 64 ceros / tamaños 0): 0.
+- **Pruebas y Verificación de Calidad**:
+  - Suite PHPUnit Completa: **109 PASSED** (406 assertions, 100% de éxito).
+  - `PlanningWorkflowTest`: 26/26 PASSED.
+  - `vendor/bin/pint --test`: **PASS** (131 archivos formateados correctamente).
+  - `composer validate`: `./composer.json is valid`.
+  - `npm audit --omit=dev`: 0 vulnerabilidades.
+  - `npm run build`: Build de producción Vite exitoso.
+- **Confirmación de NO avance**: Confirmado. Se ha concluido el Hotfix Final K-006. No se realizó commit, push, ni se inició la Skill K-007.

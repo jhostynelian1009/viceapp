@@ -194,6 +194,10 @@ class PlanningController extends Controller
         Gate::authorize('download', $planning);
 
         $currentVersion = $planning->currentVersion;
+        if ($currentVersion && $currentVersion->isMissingFile()) {
+            abort(404, 'El archivo de la planificación no se encuentra disponible.');
+        }
+
         $filePath = $currentVersion ? $currentVersion->file_path : $planning->file_path;
         $diskName = $currentVersion ? $currentVersion->file_disk : 'private_plannings';
 
@@ -214,6 +218,10 @@ class PlanningController extends Controller
         Gate::authorize('view', $planning);
 
         $currentVersion = $planning->currentVersion;
+        if ($currentVersion && $currentVersion->isMissingFile()) {
+            abort(404, 'El archivo de la planificación no se encuentra disponible.');
+        }
+
         $filePath = $currentVersion ? $currentVersion->file_path : $planning->file_path;
         $diskName = $currentVersion ? $currentVersion->file_disk : 'private_plannings';
 
@@ -252,6 +260,10 @@ class PlanningController extends Controller
 
         if ($version->planning_id !== $planning->id) {
             abort(403, 'La versión solicitada no pertenece a esta planificación.');
+        }
+
+        if ($version->isMissingFile()) {
+            abort(404, 'El archivo de esta versión no se encuentra disponible.');
         }
 
         $disk = Storage::disk($version->file_disk ?: 'private_plannings');

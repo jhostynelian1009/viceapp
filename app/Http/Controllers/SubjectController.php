@@ -38,10 +38,17 @@ class SubjectController extends Controller
             return back()->withErrors(['academic_area_id' => 'El área académica seleccionada no está activa.'])->withInput();
         }
 
-        Subject::create([
+        $subject = Subject::create([
             'name' => $validated['name'],
             'academic_area_id' => $validated['academic_area_id'],
             'code' => $validated['code'] ?? null,
+            'is_active' => true,
+        ]);
+
+        \App\Services\AuditLogger::log($request->user(), 'subject.created', $subject, null, [
+            'name' => $subject->name,
+            'academic_area_id' => $subject->academic_area_id,
+            'code' => $subject->code,
             'is_active' => true,
         ]);
 
@@ -76,11 +83,20 @@ class SubjectController extends Controller
             }
         }
 
+        $oldValues = ['name' => $subject->name, 'academic_area_id' => $subject->academic_area_id, 'code' => $subject->code, 'is_active' => $subject->is_active];
+
         $subject->update([
             'name' => $validated['name'],
             'academic_area_id' => $validated['academic_area_id'],
             'code' => $validated['code'] ?? null,
             'is_active' => $request->has('is_active') ? $validated['is_active'] : $subject->is_active,
+        ]);
+
+        \App\Services\AuditLogger::log($request->user(), 'subject.updated', $subject, $oldValues, [
+            'name' => $subject->name,
+            'academic_area_id' => $subject->academic_area_id,
+            'code' => $subject->code,
+            'is_active' => $subject->is_active,
         ]);
 
         return redirect()->route('subjects.index')
@@ -89,7 +105,10 @@ class SubjectController extends Controller
 
     public function destroy(Subject $subject)
     {
+        $oldActive = $subject->is_active;
         $subject->update(['is_active' => false]);
+
+        \App\Services\AuditLogger::log(auth()->user(), 'subject.deactivated', $subject, ['is_active' => $oldActive], ['is_active' => false]);
 
         return redirect()->route('subjects.index')
             ->with('success', 'Asignatura desactivada correctamente.');
@@ -97,7 +116,10 @@ class SubjectController extends Controller
 
     public function toggleActive(Subject $subject)
     {
+        $oldActive = $subject->is_active;
         $subject->update(['is_active' => ! $subject->is_active]);
+
+        \App\Services\AuditLogger::log(auth()->user(), 'subject.status_changed', $subject, ['is_active' => $oldActive], ['is_active' => $subject->is_active]);
 
         return redirect()->route('subjects.index')
             ->with('success', 'Estado de la asignatura actualizado correctamente.');
